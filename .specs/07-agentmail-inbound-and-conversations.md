@@ -83,4 +83,4 @@ conversation content.
 ## Non-goals
 
 Attachment OCR, mailbox search UI, custom allow/block list administration, and
-arbitrary inbound mail unrelated to an approved request.
+arbitrary inbound mail unrelated to a user-created procurement request.

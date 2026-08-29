@@ -24,7 +24,7 @@ domain functions.
 
 ## Discovery workflow
 
-1. Build a search plan from the confirmed request and requirements.
+1. Build a search plan from the current request and requirements.
 2. Search the web with a conservative MVP target of 8–12 discovered candidates.
 3. Normalize domains and upsert `businesses`.
 4. Create request-specific candidate rows as `discovered`, deduplicated by request
@@ -82,7 +82,9 @@ information, and evidence links. They do not show a universal provider score.
 - At least one email endpoint and one form endpoint can be represented.
 - Every displayed provider claim has provenance.
 - No external call occurs from a query/mutation or browser client.
-- Research completion transitions the request to `awaiting_approval`.
+- Research completion automatically selects up to five qualified candidates for
+  information gathering, transitions the request to `contacting`, and schedules
+  Spec 06 without a user approval step.
 
 ## Tests
 
@@ -95,4 +97,5 @@ information, and evidence links. They do not show a universal provider score.
 
 ## Non-goals
 
-Unbounded site crawling, reputation scoring, phone enrichment, or outreach.
+Unbounded site crawling, reputation scoring, phone enrichment, or executing outreach
+inside the research adapter.

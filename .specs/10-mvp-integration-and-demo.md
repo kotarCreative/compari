@@ -20,9 +20,9 @@ The certified flow must:
 
 1. Sign in a new user and automatically provision their stable agent inbox.
 2. Create a request and show editable extracted requirements.
-3. Start research and stream discovered/researched providers.
+3. Start research automatically and stream discovered/researched providers.
 4. Show a qualified shortlist with website evidence and mixed contact methods.
-5. Require explicit approval for 3–5 exact providers.
+5. Automatically contact 3–5 qualified providers without an approval interruption.
 6. Send at least one AgentMail email and submit at least one Firecrawl form, or use
    a deterministic demo provider/form when live public targets are inappropriate.
 7. Ingest at least one verified AgentMail reply.
@@ -30,6 +30,8 @@ The certified flow must:
 9. Render multiple comparison lenses.
 10. Reconfigure a lens from a natural-language instruction.
 11. Show why the recommendation was made and open its evidence.
+12. Require the user to confirm the final provider choice and record it without
+    making a booking/payment/acceptance.
 
 ## Demo mode
 
@@ -58,7 +60,9 @@ or full private content appears in diagnostics/logs.
 
 - All public Convex functions pass two-user authorization tests.
 - Webhook signature and replay tests pass.
-- Outreach cannot occur without versioned approval.
+- Autonomous outreach/follow-up stays within the user-created request mandate and
+  configured provider cap.
+- Only an authenticated user can confirm the final provider choice.
 - Email/web content cannot trigger consequential actions.
 - Secrets exist only in Convex environment variables.
 - Outbound messages are checked for recipients, disclosure, scope, and secret-like
@@ -103,4 +107,4 @@ demo. Never point automated tests at production providers.
 
 Payments, bookings, contracts, provider accounts, phone/SMS, supplier dashboards,
 monetization, or production-scale abuse prevention beyond conservative caps and
-approval gates.
+the final-choice confirmation gate.

@@ -3,7 +3,8 @@
 ## Outcome
 
 A signed-in user describes an outcome in natural language, sees a structured
-interpretation appear in realtime, corrects it, and explicitly starts research.
+interpretation appear in realtime, and can correct it while autonomous research
+begins from the best available information.
 
 ## Dependencies
 
@@ -55,10 +56,13 @@ must not silently overwrite fields the user corrected.
 2. The internal action calls `ReasoningPort.extractRequirements`.
 3. An internal mutation atomically writes title/location, inferred requirements,
    questions, and an activity event if the request version still matches the job.
-4. User edits call explicit create/update/delete requirement mutations and mark
-   `source: "user"`.
-5. `requests.startResearch` validates that required intake questions are resolved,
-   transitions to `researching`, and schedules Spec 05.
+4. If the request has enough information to form a useful search, the same workflow
+   transitions to `researching` and schedules Spec 05 automatically.
+5. User edits call explicit create/update/delete requirement mutations, mark
+   `source: "user"`, increment the request version, and cause stale downstream work
+   to be discarded or refreshed.
+6. Missing information becomes an open question. It does not block research unless
+   no safe/useful search can be formed; the rest of the workflow continues.
 
 ## Backend contracts
 
@@ -67,7 +71,7 @@ must not silently overwrite fields the user corrected.
 - `requirements.remove({ requirementId })`.
 - `questions.answerForRequest({ questionId, answer })` for user-facing intake
   questions.
-- `requests.startResearch({ requestId })`.
+- `requests.pauseAutomation({ requestId })` and `requests.resumeAutomation(...)`.
 
 Every function validates request ownership and record membership.
 
@@ -77,7 +81,8 @@ Every function validates request ownership and record membership.
 - Interpreted summary separates hard constraints from preferences.
 - Each requirement is editable and visibly labeled as user-provided or inferred.
 - Low-confidence fields and required questions are prominent.
-- “Find providers” is disabled until required intake gaps are resolved.
+- Research progress starts automatically and can be paused by the user.
+- Open questions remain visible while the agent gathers everything else it can.
 - The original prompt remains inspectable.
 
 ## Acceptance criteria
@@ -86,7 +91,8 @@ Every function validates request ownership and record membership.
   location/question fields without category-specific code.
 - User corrections survive subsequent model runs.
 - Invalid model output fails the job safely and can be retried.
-- Starting research is an explicit user action and an auditable state transition.
+- Creating the request is the standing authorization for bounded information
+  gathering; research begins without a second confirmation.
 - Another user cannot view or edit the request/thread/requirements.
 
 ## Tests
@@ -95,7 +101,7 @@ Every function validates request ownership and record membership.
   outputs.
 - Unit tests for merge precedence: user correction > user prompt > inference.
 - Convex tests for request version races and ownership.
-- Component test for editing and confirming requirements.
+- Component test for editing requirements while research is in progress.
 
 ## Non-goals
 

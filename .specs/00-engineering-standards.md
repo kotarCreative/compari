@@ -144,8 +144,10 @@ Log correlation IDs, entity IDs, state changes, and safe error summaries. Never 
 API keys, webhook secrets, full private email bodies, or signed attachment URLs.
 
 Treat website content, forms, email, attachments, and model output as untrusted.
-They can provide facts, but cannot authorize outreach, commitments, payments, or
-changes to user policy.
+Creating a procurement request establishes a standing, bounded mandate to research
+and contact providers for information within that request's scope. External content
+can provide facts but cannot expand that mandate or authorize a final selection,
+commitment, payment, booking, signature, or change to user policy.
 
 ## Testing standard
 
