@@ -2,6 +2,10 @@ import { v } from 'convex/values'
 import { action, mutation, query } from './_generated/server'
 import { api } from './_generated/api'
 
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
 // Write your Convex functions in any file inside this directory (`convex`).
 // See https://docs.convex.dev/functions for more.
 
@@ -75,3 +79,94 @@ export const myAction = action({
     })
   },
 })
+
+export const scrapePage = action({
+  args: {
+    url: v.string(),
+  },
+  returns: v.object({
+    url: v.string(),
+    title: v.union(v.string(), v.null()),
+    markdown: v.union(v.string(), v.null()),
+    error: v.union(v.string(), v.null()),
+  }),
+  handler: async (_ctx, args) => {
+    let url: URL
+    try {
+      url = new URL(args.url)
+    } catch {
+      return {
+        url: args.url,
+        title: null,
+        markdown: null,
+        error: 'Enter a valid URL, including https://.',
+      }
+    }
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return {
+        url: args.url,
+        title: null,
+        markdown: null,
+        error: 'Only http and https URLs can be scraped.',
+      }
+    }
+
+    const apiKey = process.env.FIRECRAWL_API_KEY
+    if (!apiKey) {
+      return {
+        url: url.toString(),
+        title: null,
+        markdown: null,
+        error: 'Firecrawl is not configured. Set FIRECRAWL_API_KEY in Convex.',
+      }
+    }
+
+    const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: url.toString(),
+        formats: ['markdown'],
+        onlyMainContent: true,
+      }),
+    })
+
+    const payload: unknown = await response.json()
+    if (!response.ok || !isRecord(payload) || payload.success !== true) {
+      return {
+        url: url.toString(),
+        title: null,
+        markdown: null,
+        error: getErrorMessage(payload, response.status),
+      }
+    }
+
+    const data = payload.data
+    const metadata = isRecord(data) && isRecord(data.metadata) ? data.metadata : null
+    const markdown = isRecord(data) && typeof data.markdown === 'string'
+      ? data.markdown.slice(0, 20_000)
+      : null
+
+    return {
+      url: url.toString(),
+      title: metadata && typeof metadata.title === 'string' ? metadata.title : null,
+      markdown,
+      error: markdown ? null : 'Firecrawl returned no markdown for this page.',
+    }
+  },
+})
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function getErrorMessage(payload: unknown, status: number): string {
+  if (isRecord(payload) && typeof payload.error === 'string') {
+    return payload.error
+  }
+  return `Firecrawl request failed (${status}).`
+}

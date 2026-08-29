@@ -1,8 +1,10 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useMutation } from 'convex/react'
+import { useAction, useMutation } from 'convex/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
+import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
+import type { FormEvent } from 'react'
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -14,6 +16,33 @@ function Home() {
   } = useSuspenseQuery(convexQuery(api.myFunctions.listNumbers, { count: 10 }))
 
   const addNumber = useMutation(api.myFunctions.addNumber)
+  const scrapePage = useAction(api.myFunctions.scrapePage)
+  const [url, setUrl] = useState('https://example.com')
+  const [scrapeResult, setScrapeResult] = useState<{
+    url: string
+    title: string | null
+    markdown: string | null
+    error: string | null
+  } | null>(null)
+  const [isScraping, setIsScraping] = useState(false)
+
+  async function handleScrape(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsScraping(true)
+    setScrapeResult(null)
+    try {
+      setScrapeResult(await scrapePage({ url }))
+    } catch {
+      setScrapeResult({
+        url,
+        title: null,
+        markdown: null,
+        error: 'Unable to reach Firecrawl. Please try again.',
+      })
+    } finally {
+      setIsScraping(false)
+    }
+  }
 
   return (
     <main className="p-8 flex flex-col gap-16">
@@ -40,6 +69,50 @@ function Home() {
           Numbers:{' '}
           {numbers.length === 0 ? 'Click the button!' : numbers.join(', ')}
         </p>
+        <section className="flex flex-col gap-3 rounded-md border border-slate-300 p-4 dark:border-slate-700">
+          <div>
+            <h2 className="text-lg font-bold">Scrape a page with Firecrawl</h2>
+            <p className="text-sm">
+              Get the primary content from a public web page as clean markdown.
+            </p>
+          </div>
+          <form className="flex flex-col gap-2" onSubmit={handleScrape}>
+            <label className="flex flex-col gap-1 text-sm" htmlFor="scrape-url">
+              Page URL
+              <input
+                className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                id="scrape-url"
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://example.com"
+                required
+                type="url"
+                value={url}
+              />
+            </label>
+            <button
+              className="self-start rounded-md border-2 bg-dark px-4 py-2 text-sm text-light disabled:cursor-not-allowed disabled:opacity-50 dark:bg-light dark:text-dark"
+              disabled={isScraping}
+              type="submit"
+            >
+              {isScraping ? 'Scraping…' : 'Scrape page'}
+            </button>
+          </form>
+          {scrapeResult?.error ? (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {scrapeResult.error}
+            </p>
+          ) : null}
+          {scrapeResult?.markdown ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-semibold">
+                {scrapeResult.title ?? scrapeResult.url}
+              </p>
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-slate-100 p-3 text-xs dark:bg-slate-900">
+                {scrapeResult.markdown}
+              </pre>
+            </div>
+          ) : null}
+        </section>
         <p>
           Edit{' '}
           <code className="text-sm font-bold font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded-md">
