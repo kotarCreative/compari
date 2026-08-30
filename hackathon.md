@@ -1,18 +1,18 @@
 # Hackathon log
 
-- **Project:** compari
+- **Project:** Compari
 - **Event:** Convex All Gas Hackathon
-- **What it does:** A buyer-side procurement agent in development; the current Convex + TanStack Start prototype persists demo data and uses a server-side Firecrawl action to extract public web pages.
+- **What it does:** A buyer-side procurement workflow in development that turns requests into evidence-backed provider comparisons, with bounded automated research/outreach and an explicit final-choice gate.
 - **Live app:** not deployed
 - **Repo:** none
-- **Frontend:** not deployed
+- **Frontend:** Other (TanStack Start)
 - **Convex deployment:** not deployed
 - **Components:** none
-- **Convex features:** schema, tables, queries, mutations, actions
-- **Auth:** none
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, realtime queries
+- **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-08-29T03:47:44Z
+- **Last updated:** 2026-08-29T21:28:50Z
 
 ## Log
 
@@ -43,3 +43,9 @@ Defined an executable MVP roadmap covering passkey authentication, automatic per
 ### 2026-08-28 - 344d172
 
 Refined the planned agent workflow so creating a request authorizes bounded autonomous provider research, outreach, and factual follow-ups. The only mandatory confirmation gate is the user's final provider choice; automated booking, payment, signing, acceptance, and scope expansion remain prohibited (`.specs/Roadmap.md`, `.specs/06-autonomous-outreach-and-contact.md`, `.specs/09-evaluation-and-dynamic-ui.md`).
+
+### 2026-08-29 - working tree
+
+Replaced the starter demo with an authenticated procurement workspace: user bootstrap and inbox jobs, owned requests and requirements, candidate research/outreach, conversations, evidence-backed proposals, trusted comparison views, diagnostics, and an explicit final-choice mutation (`convex/`, `src/features/`). Added leased side-effect jobs, bounded indexed reads, state policies, and server-gated deterministic demo adapters; local typecheck, lint, build, and 12 deterministic tests pass.
+
+The app is not deployed. Real passkeys, verified inbound webhooks, and production AgentMail, Firecrawl, and AI calls remain deliberately fail-closed until their providers, credentials, and deployment-backed verification are available.

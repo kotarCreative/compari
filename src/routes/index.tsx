@@ -1,193 +1,418 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { useAction, useMutation } from 'convex/react'
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { useState } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { useAuthActions } from '@convex-dev/auth/react'
+import { useConvexAuth, useMutation, useQuery } from 'convex/react'
+import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
+import { DecisionPanel } from '../features/decision/DecisionPanel'
+import { DemoModeBanner } from '../features/decision/DemoModeBanner'
+import { RequestDetail } from '../features/request/RequestDetail'
+import type { FunctionReference } from 'convex/server'
 import type { FormEvent } from 'react'
 
-export const Route = createFileRoute('/')({
-  component: Home,
-})
+type Profile = {
+  name?: string
+  email?: string
+  agentEmailAddress?: string
+  inboxProvisioningStatus?:
+    | 'pending'
+    | 'provisioning'
+    | 'ready'
+    | 'retryable_failure'
+    | 'permanent_failure'
+}
+type NoArgs = Record<string, never>
+const pendingFirstRequestKey = 'compari.pending-first-request'
+type RequestList = {
+  page: Array<{
+    _id: string
+    title: string
+    prompt: string
+    status: string
+    researchStatus: string
+    automationPaused: boolean
+    candidateCounts: { discovered: number; qualified: number; rejected: number }
+  }>
+  continueCursor: string
+  isDone: boolean
+}
+const usersApi = api as unknown as {
+  users: {
+    ensureCurrentUser: FunctionReference<'mutation', 'public', NoArgs, string>
+    current: FunctionReference<'query', 'public', NoArgs, Profile | null>
+    retryMyInboxProvisioning: FunctionReference<
+      'mutation',
+      'public',
+      NoArgs,
+      null
+    >
+  }
+}
+const requestsApi = api as unknown as {
+  requests: {
+    create: FunctionReference<'mutation', 'public', { prompt: string }, string>
+    list: FunctionReference<
+      'query',
+      'public',
+      { paginationOpts: { numItems: number; cursor: string | null } },
+      RequestList
+    >
+    pauseAutomation: FunctionReference<
+      'mutation',
+      'public',
+      { requestId: string },
+      null
+    >
+    resumeAutomation: FunctionReference<
+      'mutation',
+      'public',
+      { requestId: string },
+      null
+    >
+  }
+}
+
+export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
-  const {
-    data: { viewer, numbers },
-  } = useSuspenseQuery(convexQuery(api.myFunctions.listNumbers, { count: 10 }))
+  const { isLoading, isAuthenticated } = useConvexAuth()
+  if (isLoading)
+    return (
+      <CenteredMessage
+        title="Checking your secure session…"
+        detail="Compari keeps your workspace private while it restores your session."
+      />
+    )
+  if (!isAuthenticated) return <FirstSearch />
+  return <Bootstrap />
+}
 
-  const addNumber = useMutation(api.myFunctions.addNumber)
-  const scrapePage = useAction(api.myFunctions.scrapePage)
-  const [url, setUrl] = useState('https://example.com')
-  const [scrapeResult, setScrapeResult] = useState<{
-    url: string
-    title: string | null
-    markdown: string | null
-    error: string | null
-  } | null>(null)
-  const [isScraping, setIsScraping] = useState(false)
-
-  async function handleScrape(event: FormEvent<HTMLFormElement>) {
+function FirstSearch() {
+  const { signIn } = useAuthActions()
+  const [prompt, setPrompt] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isStarting, setIsStarting] = useState(false)
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setIsScraping(true)
-    setScrapeResult(null)
+    setError(null)
+    setIsStarting(true)
     try {
-      setScrapeResult(await scrapePage({ url }))
+      window.sessionStorage.setItem(pendingFirstRequestKey, prompt.trim())
+      await signIn('anonymous')
     } catch {
-      setScrapeResult({
-        url,
-        title: null,
-        markdown: null,
-        error: 'Unable to reach Firecrawl. Please try again.',
-      })
+      setError(
+        'We could not create your private workspace. Please try again.',
+      )
     } finally {
-      setIsScraping(false)
+      setIsStarting(false)
     }
   }
-
   return (
-    <main className="p-8 flex flex-col gap-16">
-      <h1 className="text-4xl font-bold text-center">
-        Convex + Tanstack Start
-      </h1>
-      <div className="flex flex-col gap-8 max-w-lg mx-auto">
-        <p>Welcome {viewer ?? 'Anonymous'}!</p>
-        <p>
-          Click the button below and open this page in another window - this
-          data is persisted in the Convex cloud database!
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 p-8">
+      <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
+        COMPARI
+      </p>
+      <div className="space-y-4">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Procurement research, with you in control.
+        </h1>
+        <p className="max-w-xl text-lg text-slate-600 dark:text-slate-300">
+          Describe what you need. Your first search creates a private workspace
+          that stays on this device.
         </p>
-        <p>
-          <button
-            className="bg-dark dark:bg-light text-light dark:text-dark text-sm px-4 py-2 rounded-md border-2"
-            onClick={() => {
-              void addNumber({ value: Math.floor(Math.random() * 10) })
-            }}
-          >
-            Add a random number
-          </button>
-        </p>
-        <p>
-          Numbers:{' '}
-          {numbers.length === 0 ? 'Click the button!' : numbers.join(', ')}
-        </p>
-        <section className="flex flex-col gap-3 rounded-md border border-slate-300 p-4 dark:border-slate-700">
-          <div>
-            <h2 className="text-lg font-bold">Scrape a page with Firecrawl</h2>
-            <p className="text-sm">
-              Get the primary content from a public web page as clean markdown.
-            </p>
-          </div>
-          <form className="flex flex-col gap-2" onSubmit={handleScrape}>
-            <label className="flex flex-col gap-1 text-sm" htmlFor="scrape-url">
-              Page URL
-              <input
-                className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                id="scrape-url"
-                onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://example.com"
-                required
-                type="url"
-                value={url}
-              />
-            </label>
-            <button
-              className="self-start rounded-md border-2 bg-dark px-4 py-2 text-sm text-light disabled:cursor-not-allowed disabled:opacity-50 dark:bg-light dark:text-dark"
-              disabled={isScraping}
-              type="submit"
-            >
-              {isScraping ? 'Scraping…' : 'Scrape page'}
-            </button>
-          </form>
-          {scrapeResult?.error ? (
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {scrapeResult.error}
-            </p>
-          ) : null}
-          {scrapeResult?.markdown ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">
-                {scrapeResult.title ?? scrapeResult.url}
-              </p>
-              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-slate-100 p-3 text-xs dark:bg-slate-900">
-                {scrapeResult.markdown}
-              </pre>
-            </div>
-          ) : null}
-        </section>
-        <p>
-          Edit{' '}
-          <code className="text-sm font-bold font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded-md">
-            convex/myFunctions.ts
-          </code>{' '}
-          to change your backend
-        </p>
-        <p>
-          Edit{' '}
-          <code className="text-sm font-bold font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded-md">
-            src/routes/index.tsx
-          </code>{' '}
-          to change your frontend
-        </p>
-        <p>
-          Open{' '}
-          <Link
-            to="/anotherPage"
-            className="text-blue-600 underline hover:no-underline"
-          >
-            another page
-          </Link>{' '}
-          to send an action.
-        </p>
-        <div className="flex flex-col">
-          <p className="text-lg font-bold">Useful resources:</p>
-          <div className="flex gap-2">
-            <div className="flex flex-col gap-2 w-1/2">
-              <ResourceCard
-                title="Convex docs"
-                description="Read comprehensive documentation for all Convex features."
-                href="https://docs.convex.dev/home"
-              />
-              <ResourceCard
-                title="Stack articles"
-                description="Learn about best practices, use cases, and more from a growing
-            collection of articles, videos, and walkthroughs."
-                href="https://www.typescriptlang.org/docs/handbook/2/basic-types.html"
-              />
-            </div>
-            <div className="flex flex-col gap-2 w-1/2">
-              <ResourceCard
-                title="Templates"
-                description="Browse our collection of templates to get started quickly."
-                href="https://www.convex.dev/templates"
-              />
-              <ResourceCard
-                title="Discord"
-                description="Join our developer community to ask questions, trade tips & tricks,
-            and show off your projects."
-                href="https://www.convex.dev/community"
-              />
-            </div>
-          </div>
-        </div>
       </div>
+      <form className="space-y-3" onSubmit={(event) => void submit(event)}>
+        <label className="block text-sm font-medium" htmlFor="first-request-prompt">
+          What are you looking for?
+        </label>
+        <textarea
+          className="min-h-32 w-full rounded-md border border-slate-300 bg-transparent p-3 dark:border-slate-700"
+          id="first-request-prompt"
+          minLength={12}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="For example: Find three Edmonton printers that can produce 500 event programs by next Friday within a $1,500 budget."
+          required
+          value={prompt}
+        />
+        <button
+          className="rounded-md bg-slate-950 px-5 py-3 font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+          disabled={isStarting || prompt.trim().length < 12}
+          type="submit"
+        >
+          {isStarting ? 'Creating your workspace…' : 'Start comparison'}
+        </button>
+        {error ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        ) : null}
+      </form>
     </main>
   )
 }
 
-function ResourceCard({
+function Bootstrap() {
+  const ensureCurrentUser = useMutation(usersApi.users.ensureCurrentUser)
+  const profile = useQuery(usersApi.users.current)
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  useEffect(() => {
+    if ((profile !== undefined && profile !== null) || bootstrapError) return
+    void ensureCurrentUser({}).catch(() =>
+      setBootstrapError(
+        'We could not prepare your private workspace. Retry below; your sign-in is still active.',
+      ),
+    )
+  }, [bootstrapError, ensureCurrentUser, profile])
+  if (bootstrapError)
+    return (
+      <CenteredMessage
+        title="Workspace setup needs a retry"
+        detail={bootstrapError}
+        action="Retry setup"
+        onAction={() => setBootstrapError(null)}
+      />
+    )
+  if (profile === undefined || profile === null)
+    return (
+      <CenteredMessage
+        title="Preparing your buyer workspace…"
+        detail="This only takes a moment and never sends email on your behalf."
+      />
+    )
+  return <ProtectedShell profile={profile} />
+}
+
+function ProtectedShell({ profile }: { profile: Profile }) {
+  const { signOut } = useAuthActions()
+  const retryInbox = useMutation(usersApi.users.retryMyInboxProvisioning)
+  const [retryError, setRetryError] = useState<string | null>(null)
+  const status = profile.inboxProvisioningStatus ?? 'pending'
+  const inboxDetail =
+    status === 'ready'
+      ? profile.agentEmailAddress
+      : status === 'permanent_failure'
+        ? 'Inbox setup needs support.'
+        : status === 'retryable_failure'
+          ? 'Inbox setup can be retried.'
+          : 'Creating your dedicated buyer inbox…'
+  return (
+    <main className="mx-auto min-h-screen max-w-4xl p-8">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-6 dark:border-slate-800">
+        <div>
+          <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
+            COMPARI
+          </p>
+          <h1 className="mt-2 text-3xl font-bold">Your buyer workspace</h1>
+        </div>
+        <button
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"
+          onClick={() => void signOut()}
+          type="button"
+        >
+          Sign out
+        </button>
+      </header>
+      <section className="mt-8 grid gap-6 md:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+          <h2 className="font-semibold">Account</h2>
+          <p className="mt-3 text-slate-600 dark:text-slate-300">
+            {profile.name ?? profile.email ?? 'Private device workspace'}
+          </p>
+          {profile.email ? (
+            <p className="text-sm text-slate-500">{profile.email}</p>
+          ) : null}
+        </article>
+        <article className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+          <h2 className="font-semibold">Buyer inbox</h2>
+          <p className="mt-3 text-slate-600 dark:text-slate-300">
+            {inboxDetail}
+          </p>
+          {status === 'retryable_failure' || status === 'permanent_failure' ? (
+            <button
+              className="mt-3 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"
+              onClick={() =>
+                void retryInbox({}).catch(() =>
+                  setRetryError(
+                    'Inbox retry failed. Please try again shortly.',
+                  ),
+                )
+              }
+              type="button"
+            >
+              Retry inbox setup
+            </button>
+          ) : null}
+          {retryError ? (
+            <p className="mt-2 text-sm text-red-600">{retryError}</p>
+          ) : null}
+        </article>
+      </section>
+      <DemoModeBanner />
+      <RequestWorkspace />
+    </main>
+  )
+}
+
+function RequestWorkspace() {
+  const create = useMutation(requestsApi.requests.create)
+  const pause = useMutation(requestsApi.requests.pauseAutomation)
+  const resume = useMutation(requestsApi.requests.resumeAutomation)
+  const requests = useQuery(requestsApi.requests.list, {
+    paginationOpts: { numItems: 20, cursor: null },
+  })
+  const [prompt, setPrompt] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
+    null,
+  )
+  useEffect(() => {
+    const pendingPrompt = window.sessionStorage.getItem(pendingFirstRequestKey)
+    if (!pendingPrompt) return
+    window.sessionStorage.removeItem(pendingFirstRequestKey)
+    setPrompt(pendingPrompt)
+    void create({ prompt: pendingPrompt })
+      .then(() => setPrompt(''))
+      .catch((reason) =>
+        setError(
+          reason instanceof Error
+            ? reason.message.replace(/^\w+:\s*/, '')
+            : 'Unable to create request.',
+        ),
+      )
+  }, [create])
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    try {
+      await create({ prompt })
+      setPrompt('')
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message.replace(/^\w+:\s*/, '')
+          : 'Unable to create request.',
+      )
+    }
+  }
+  if (selectedRequestId)
+    return (
+      <RequestDetail
+        onClose={() => setSelectedRequestId(null)}
+        requestId={selectedRequestId}
+      />
+    )
+  return (
+    <section className="mt-8 space-y-5 border-t border-slate-200 pt-8 dark:border-slate-800">
+      <div>
+        <h2 className="text-xl font-bold">Start a comparison</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          Describe the outcome. Compari will interpret editable requirements and
+          only research within this request’s scope.
+        </p>
+      </div>
+      <form className="space-y-3" onSubmit={(event) => void submit(event)}>
+        <label className="block text-sm font-medium" htmlFor="request-prompt">
+          What are you looking for?
+        </label>
+        <textarea
+          className="min-h-28 w-full rounded-md border border-slate-300 bg-transparent p-3 dark:border-slate-700"
+          id="request-prompt"
+          minLength={12}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="For example: Find three Edmonton printers that can produce 500 event programs by next Friday within a $1,500 budget."
+          required
+          value={prompt}
+        />
+        <button
+          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+          disabled={prompt.trim().length < 12}
+          type="submit"
+        >
+          Create request
+        </button>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </form>
+      <div className="space-y-3">
+        <h3 className="font-semibold">Your requests</h3>
+        {requests === undefined ? (
+          <p className="text-sm text-slate-500">Loading requests…</p>
+        ) : requests.page.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Your requests will appear here.
+          </p>
+        ) : (
+          requests.page.map((request) => (
+            <article
+              className="rounded-lg border border-slate-200 p-4 dark:border-slate-800"
+              key={request._id}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 className="font-semibold">{request.title}</h4>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    {request.prompt}
+                  </p>
+                </div>
+                <span className="rounded bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+                  {request.status}
+                </span>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">
+                {request.candidateCounts.discovered} discovered ·{' '}
+                {request.candidateCounts.qualified} qualified ·{' '}
+                {request.candidateCounts.rejected} rejected ·{' '}
+                {request.researchStatus}
+              </p>
+              <button
+                className="mt-3 rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700"
+                onClick={() =>
+                  void (request.automationPaused
+                    ? resume({ requestId: request._id })
+                    : pause({ requestId: request._id }))
+                }
+                type="button"
+              >
+                {request.automationPaused
+                  ? 'Resume research'
+                  : 'Pause automation'}
+              </button>
+              <button
+                className="ml-2 rounded border border-sky-300 px-3 py-1.5 text-sm"
+                onClick={() => setSelectedRequestId(request._id)}
+                type="button"
+              >
+                Open workspace
+              </button>
+              <DecisionPanel requestId={request._id} status={request.status} />
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function CenteredMessage({
   title,
-  description,
-  href,
+  detail,
+  action,
+  onAction,
 }: {
   title: string
-  description: string
-  href: string
+  detail: string
+  action?: string
+  onAction?: () => void
 }) {
   return (
-    <div className="flex flex-col gap-2 bg-slate-200 dark:bg-slate-800 p-4 rounded-md h-28 overflow-auto">
-      <a href={href} className="text-sm underline hover:no-underline">
-        {title}
-      </a>
-      <p className="text-xs">{description}</p>
-    </div>
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-3 p-8">
+      <h1 className="text-2xl font-bold">{title}</h1>
+      <p className="text-slate-600 dark:text-slate-300">{detail}</p>
+      {action && onAction ? (
+        <button
+          className="mt-2 w-fit rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"
+          onClick={onAction}
+          type="button"
+        >
+          {action}
+        </button>
+      ) : null}
+    </main>
   )
 }
