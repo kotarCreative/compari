@@ -8,7 +8,7 @@ import { mutation, query } from './_generated/server'
 import { requireCurrentUser, requireOwnedRequest } from './lib/auth'
 import { canResearch, transitionRequest } from './domain/workflowState'
 import type { FunctionReference } from 'convex/server'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 
 const requestSummary = v.object({
   _id: v.id('procurementRequests'),
@@ -45,6 +45,37 @@ const requestSummary = v.object({
   createdAt: v.number(),
   updatedAt: v.number(),
 })
+
+function toRequestSummary(request: Doc<'procurementRequests'>) {
+  return {
+    _id: request._id,
+    prompt: request.prompt,
+    title: request.title,
+    ...(request.location === undefined ? {} : { location: request.location }),
+    status: request.status,
+    automationPaused: request.automationPaused,
+    version: request.version,
+    researchStatus: request.researchStatus,
+    candidateCounts: request.candidateCounts,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+  }
+}
+
+function toActivitySummary(event: Doc<'activityEvents'>) {
+  return {
+    _id: event._id,
+    requestId: event.requestId,
+    ...(event.candidateId === undefined
+      ? {}
+      : { candidateId: event.candidateId }),
+    eventType: event.eventType,
+    safeMessage: event.safeMessage,
+    correlationId: event.correlationId,
+    createdAt: event.createdAt,
+  }
+}
+
 const workflow = internal as unknown as {
   workflows: {
     extractRequirements: FunctionReference<
@@ -107,11 +138,10 @@ export const create = mutation({
       correlationId: String(jobId),
       createdAt: now,
     })
-    await ctx.scheduler.runAfter(
-      0,
-      workflow.workflows.extractRequirements,
-      { requestId, jobId },
-    )
+    await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+      requestId,
+      jobId,
+    })
     return requestId
   },
 })
@@ -121,11 +151,12 @@ export const list = query({
   returns: paginationResultValidator(requestSummary),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
-    return await ctx.db
+    const result = await ctx.db
       .query('procurementRequests')
       .withIndex('by_user_id_and_updated_at', (q) => q.eq('userId', user._id))
       .order('desc')
       .paginate(args.paginationOpts)
+    return { ...result, page: result.page.map(toRequestSummary) }
   },
 })
 export const get = query({
@@ -133,7 +164,7 @@ export const get = query({
   returns: v.union(v.null(), requestSummary),
   handler: async (ctx, args) => {
     const { request } = await requireOwnedRequest(ctx, args.requestId)
-    return request
+    return toRequestSummary(request)
   },
 })
 export const cancel = mutation({
@@ -147,7 +178,10 @@ export const cancel = mutation({
       )
     transitionRequest(request.status, 'cancelled')
     const now = Date.now()
-    await ctx.db.patch("procurementRequests", request._id, { status: 'cancelled', updatedAt: now })
+    await ctx.db.patch('procurementRequests', request._id, {
+      status: 'cancelled',
+      updatedAt: now,
+    })
     await ctx.db.insert('activityEvents', {
       requestId: request._id,
       eventType: 'request_cancelled',
@@ -165,7 +199,7 @@ export const pauseAutomation = mutation({
     const { request } = await requireOwnedRequest(ctx, args.requestId)
     if (request.status === 'cancelled' || request.status === 'completed')
       throw new Error('validation: automation cannot be paused now')
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       automationPaused: true,
       updatedAt: Date.now(),
     })
@@ -179,9 +213,11 @@ export const resumeAutomation = mutation({
     const { request } = await requireOwnedRequest(ctx, args.requestId)
     if (request.status === 'cancelled' || request.status === 'completed')
       throw new Error('validation: automation cannot be resumed now')
+    if (!request.automationPaused)
+      throw new Error('validation: automation is already running')
     const now = Date.now()
     const nextVersion = request.version + 1
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       automationPaused: false,
       version: nextVersion,
       updatedAt: now,
@@ -189,21 +225,75 @@ export const resumeAutomation = mutation({
     const existing = await ctx.db
       .query('sideEffectJobs')
       .withIndex('by_idempotency_key', (q) =>
-        q.eq('idempotencyKey', `extract-requirements:${request._id}:v${nextVersion}`),
+        q.eq(
+          'idempotencyKey',
+          `extract-requirements:${request._id}:v${nextVersion}`,
+        ),
       )
       .unique()
     if (!existing) {
       const jobId = await ctx.db.insert('sideEffectJobs', {
-        userId: request.userId, kind: 'extract_requirements',
+        userId: request.userId,
+        kind: 'extract_requirements',
         idempotencyKey: `extract-requirements:${request._id}:v${nextVersion}`,
-        status: 'pending', attemptCount: 0, maxAttempts: 3,
-        requestId: request._id, inputVersion: nextVersion, scheduledAt: now,
-        createdAt: now, updatedAt: now,
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: 3,
+        requestId: request._id,
+        inputVersion: nextVersion,
+        scheduledAt: now,
+        createdAt: now,
+        updatedAt: now,
       })
       await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
-        requestId: request._id, jobId,
+        requestId: request._id,
+        jobId,
       })
     }
+    return null
+  },
+})
+export const retryIntake = mutation({
+  args: { requestId: v.id('procurementRequests') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { request } = await requireOwnedRequest(ctx, args.requestId)
+    if (request.status !== 'draft' || request.automationPaused)
+      throw new Error('validation: request intake cannot be retried now')
+    const job = await ctx.db
+      .query('sideEffectJobs')
+      .withIndex('by_idempotency_key', (q) =>
+        q.eq(
+          'idempotencyKey',
+          `extract-requirements:${request._id}:v${request.version}`,
+        ),
+      )
+      .unique()
+    if (
+      !job ||
+      (job.status !== 'permanent_failure' && job.status !== 'needs_user')
+    )
+      throw new Error('validation: request intake does not need a retry')
+    const now = Date.now()
+    await ctx.db.patch('sideEffectJobs', job._id, {
+      status: 'pending',
+      attemptCount: 0,
+      lastErrorCategory: undefined,
+      lastErrorSummary: undefined,
+      scheduledAt: now,
+      updatedAt: now,
+    })
+    await ctx.db.insert('activityEvents', {
+      requestId: request._id,
+      eventType: 'request_intake_retried',
+      safeMessage: 'Request interpretation was retried by the buyer.',
+      correlationId: String(job._id),
+      createdAt: now,
+    })
+    await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+      requestId: request._id,
+      jobId: job._id,
+    })
     return null
   },
 })
@@ -225,13 +315,14 @@ export const activity = query({
   ),
   handler: async (ctx, args) => {
     await requireOwnedRequest(ctx, args.requestId)
-    return await ctx.db
+    const result = await ctx.db
       .query('activityEvents')
       .withIndex('by_request_id_and_created_at', (q) =>
         q.eq('requestId', args.requestId),
       )
       .order('desc')
       .paginate(args.paginationOpts)
+    return { ...result, page: result.page.map(toActivitySummary) }
   },
 })
 
@@ -242,7 +333,7 @@ export const beginResearchIfUseful = mutation({
     const { request } = await requireOwnedRequest(ctx, args.requestId)
     if (!canResearch(request.prompt) || request.status !== 'draft') return false
     transitionRequest('draft', 'researching')
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       status: 'researching',
       researchStatus: 'in_progress',
       updatedAt: Date.now(),

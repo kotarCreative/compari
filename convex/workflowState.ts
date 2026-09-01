@@ -17,34 +17,76 @@ import type { Id } from './_generated/dataModel'
  * the composite index, so no broad job scan decides buyer-facing work. */
 async function queueRankingWhenInitialResearchSettles(
   ctx: MutationCtx,
-  request: { _id: Id<'procurementRequests'>; userId: Id<'users'>; version: number; status: string; automationPaused: boolean },
+  request: {
+    _id: Id<'procurementRequests'>
+    userId: Id<'users'>
+    version: number
+    status: string
+    automationPaused: boolean
+  },
   now: number,
 ): Promise<Id<'sideEffectJobs'> | null> {
   if (request.automationPaused || request.status !== 'researching') return null
-  const active = await Promise.all(['pending', 'running', 'retryable_failure'].map(status =>
-    ctx.db.query('sideEffectJobs')
-      .withIndex('by_request_id_and_kind_and_status_and_input_version', q => q.eq('requestId', request._id).eq('kind', 'research_candidate').eq('status', status as 'pending' | 'running' | 'retryable_failure').eq('inputVersion', request.version))
-      .take(1),
-  ))
-  const qualified = await ctx.db.query('requestCandidates')
-    .withIndex('by_request_id_and_status', q => q.eq('requestId', request._id).eq('status', 'qualified'))
+  const active = await Promise.all(
+    ['pending', 'running', 'retryable_failure'].map((status) =>
+      ctx.db
+        .query('sideEffectJobs')
+        .withIndex('by_request_id_and_kind_and_status_and_input_version', (q) =>
+          q
+            .eq('requestId', request._id)
+            .eq('kind', 'research_candidate')
+            .eq('status', status as 'pending' | 'running' | 'retryable_failure')
+            .eq('inputVersion', request.version),
+        )
+        .take(1),
+    ),
+  )
+  const qualified = await ctx.db
+    .query('requestCandidates')
+    .withIndex('by_request_id_and_status', (q) =>
+      q.eq('requestId', request._id).eq('status', 'qualified'),
+    )
     .take(1)
-  const settlement = rankingSettlement({ activeResearchJobs: active.reduce((total, jobs) => total + jobs.length, 0), qualifiedCandidates: qualified.length })
+  const settlement = rankingSettlement({
+    activeResearchJobs: active.reduce((total, jobs) => total + jobs.length, 0),
+    qualifiedCandidates: qualified.length,
+  })
   if (settlement === 'wait') return null
   if (settlement === 'empty') {
-    await ctx.db.patch('procurementRequests', request._id, { rankingStatus: 'ready', rankingError: undefined, rankingVersion: request.version, updatedAt: now })
+    await ctx.db.patch('procurementRequests', request._id, {
+      rankingStatus: 'ready',
+      rankingError: undefined,
+      rankingVersion: request.version,
+      updatedAt: now,
+    })
     return null
   }
   const idempotencyKey = `rank:${request._id}:v${request.version}:initial-settled`
-  const existing = await ctx.db.query('sideEffectJobs')
-    .withIndex('by_idempotency_key', q => q.eq('idempotencyKey', idempotencyKey)).unique()
+  const existing = await ctx.db
+    .query('sideEffectJobs')
+    .withIndex('by_idempotency_key', (q) =>
+      q.eq('idempotencyKey', idempotencyKey),
+    )
+    .unique()
   if (existing) return null
   const jobId = await ctx.db.insert('sideEffectJobs', {
-    userId: request.userId, kind: 'rank_candidates', idempotencyKey,
-    status: 'pending', attemptCount: 0, maxAttempts: 3, requestId: request._id,
-    inputVersion: request.version, scheduledAt: now, createdAt: now, updatedAt: now,
+    userId: request.userId,
+    kind: 'rank_candidates',
+    idempotencyKey,
+    status: 'pending',
+    attemptCount: 0,
+    maxAttempts: 3,
+    requestId: request._id,
+    inputVersion: request.version,
+    scheduledAt: now,
+    createdAt: now,
+    updatedAt: now,
   })
-  await ctx.db.patch('procurementRequests', request._id, { rankingStatus: 'pending', rankingError: undefined, updatedAt: now })
+  await ctx.db.patch('procurementRequests', request._id, {
+    rankingStatus: 'pending',
+    rankingError: undefined,
+    updatedAt: now,
+  })
   return jobId
 }
 
@@ -71,11 +113,20 @@ export const loadRequestForJob = internalQuery({
         v.literal('cancelled'),
       ),
       automationPaused: v.boolean(),
-      corrections: v.array(v.object({
-        key: v.string(), label: v.string(), value: v.any(),
-        kind: v.union(v.literal('hard_constraint'), v.literal('preference'), v.literal('information')),
-        importance: v.optional(v.number()), confidence: v.number(),
-      })),
+      corrections: v.array(
+        v.object({
+          key: v.string(),
+          label: v.string(),
+          value: v.any(),
+          kind: v.union(
+            v.literal('hard_constraint'),
+            v.literal('preference'),
+            v.literal('information'),
+          ),
+          importance: v.optional(v.number()),
+          confidence: v.number(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -90,18 +141,26 @@ export const loadRequestForJob = internalQuery({
       job.claimToken !== args.claimToken
     )
       return null
-    const corrections = await ctx.db.query('requirements')
-      .withIndex('by_request_id', (q) => q.eq('requestId', request._id)).take(100)
+    const corrections = await ctx.db
+      .query('requirements')
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+      .take(100)
     return {
       prompt: request.prompt,
       location: request.location,
       version: request.version,
       status: request.status,
       automationPaused: request.automationPaused,
-      corrections: corrections.filter((item) => item.source === 'user').map((item) => ({
-        key: item.key, label: item.label, value: item.value.value, kind: item.kind,
-        importance: item.importance, confidence: item.confidence,
-      })),
+      corrections: corrections
+        .filter((item) => item.source === 'user')
+        .map((item) => ({
+          key: item.key,
+          label: item.label,
+          value: item.value.value,
+          kind: item.kind,
+          importance: item.importance,
+          confidence: item.confidence,
+        })),
     }
   },
 })
@@ -113,14 +172,26 @@ export const completeIntake = internalMutation({
     output: v.object({
       title: v.string(),
       location: v.optional(v.string()),
-      requirements: v.array(v.object({
-        key: v.string(), label: v.string(), value: v.any(),
-        kind: v.union(v.literal('hard_constraint'), v.literal('preference'), v.literal('information')),
-        importance: v.optional(v.number()), confidence: v.number(),
-      })),
-      clarifyingQuestions: v.array(v.object({
-        question: v.string(), importance: v.union(v.literal('required'), v.literal('useful')),
-      })),
+      requirements: v.array(
+        v.object({
+          key: v.string(),
+          label: v.string(),
+          value: v.any(),
+          kind: v.union(
+            v.literal('hard_constraint'),
+            v.literal('preference'),
+            v.literal('information'),
+          ),
+          importance: v.optional(v.number()),
+          confidence: v.number(),
+        }),
+      ),
+      clarifyingQuestions: v.array(
+        v.object({
+          question: v.string(),
+          importance: v.union(v.literal('required'), v.literal('useful')),
+        }),
+      ),
     }),
   },
   returns: v.null(),
@@ -138,39 +209,79 @@ export const completeIntake = internalMutation({
       return null
     const now = Date.now()
     const outputRequirements = args.output.requirements.slice(0, 20)
-    const existingRequirements = await ctx.db.query('requirements')
-      .withIndex('by_request_id', (q) => q.eq('requestId', request._id)).take(100)
-    const userKeys = new Set(existingRequirements.filter((item) => item.source === 'user').map((item) => item.key))
+    const existingRequirements = await ctx.db
+      .query('requirements')
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+      .take(100)
+    const userKeys = new Set(
+      existingRequirements
+        .filter((item) => item.source === 'user')
+        .map((item) => item.key),
+    )
     for (const item of outputRequirements) {
-      if (!/^[a-z0-9_]{1,64}$/.test(item.key) || userKeys.has(item.key)) continue
-      try { validateBoundedJson(item.value) } catch { continue }
+      if (!/^[a-z0-9_]{1,64}$/.test(item.key) || userKeys.has(item.key))
+        continue
+      try {
+        validateBoundedJson(item.value)
+      } catch {
+        continue
+      }
       const existing = existingRequirements.find((row) => row.key === item.key)
-      const patch = { label: item.label.slice(0, 160), value: { schemaVersion: 1 as const, value: item.value }, kind: item.kind, importance: item.importance, source: 'inference' as const, confidence: Math.max(0, Math.min(1, item.confidence)), updatedAt: now }
+      const patch = {
+        label: item.label.slice(0, 160),
+        value: { schemaVersion: 1 as const, value: item.value },
+        kind: item.kind,
+        importance: item.importance,
+        source: 'inference' as const,
+        confidence: Math.max(0, Math.min(1, item.confidence)),
+        updatedAt: now,
+      }
       if (existing) await ctx.db.patch('requirements', existing._id, patch)
-      else await ctx.db.insert('requirements', { requestId: request._id, key: item.key, ...patch, createdAt: now })
+      else
+        await ctx.db.insert('requirements', {
+          requestId: request._id,
+          key: item.key,
+          ...patch,
+          createdAt: now,
+        })
     }
-    const openQuestions = await ctx.db.query('questions').withIndex('by_request_id_and_status', (q) => q.eq('requestId', request._id).eq('status', 'open')).take(100)
+    const openQuestions = await ctx.db
+      .query('questions')
+      .withIndex('by_request_id_and_status', (q) =>
+        q.eq('requestId', request._id).eq('status', 'open'),
+      )
+      .take(100)
     for (const question of args.output.clarifyingQuestions.slice(0, 10)) {
       const text = question.question.trim().slice(0, 500)
       if (text && !openQuestions.some((existing) => existing.text === text))
-        await ctx.db.insert('questions', { requestId: request._id, text, importance: question.importance, status: 'open', supportingFactIds: [], createdAt: now, updatedAt: now })
+        await ctx.db.insert('questions', {
+          requestId: request._id,
+          text,
+          importance: question.importance,
+          status: 'open',
+          supportingFactIds: [],
+          createdAt: now,
+          updatedAt: now,
+        })
     }
     if (request.status === 'draft') transitionRequest('draft', 'researching')
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       title: args.output.title.trim().slice(0, 120) || 'Procurement request',
       location: args.output.location?.trim().slice(0, 160) || request.location,
       status: request.status === 'draft' ? 'researching' : request.status,
-      researchStatus: request.status === 'draft' ? 'in_progress' : request.researchStatus,
+      researchStatus:
+        request.status === 'draft' ? 'in_progress' : request.researchStatus,
       updatedAt: now,
     })
-    await ctx.db.patch("sideEffectJobs", job._id, {
+    await ctx.db.patch('sideEffectJobs', job._id, {
       status: 'succeeded',
       completedAt: now,
       claimToken: undefined,
       leaseExpiresAt: undefined,
       updatedAt: now,
     })
-    if (request.status !== 'draft' && request.status !== 'researching') return null
+    if (request.status !== 'draft' && request.status !== 'researching')
+      return null
     const discoveryJobId = await ctx.db.insert('sideEffectJobs', {
       userId: request.userId,
       kind: 'discover_providers',
@@ -226,6 +337,7 @@ export const recordDiscovery = internalMutation({
       return null
     const now = Date.now()
     let discovered = 0
+    let usableProviders = 0
     const scheduled: Array<{
       candidateId: Id<'requestCandidates'>
       jobId: Id<'sideEffectJobs'>
@@ -258,6 +370,7 @@ export const recordDiscovery = internalMutation({
           q.eq('requestId', request._id).eq('businessId', business._id),
         )
         .unique()
+      usableProviders++
       if (!candidate) {
         const candidateId = await ctx.db.insert('requestCandidates', {
           requestId: request._id,
@@ -286,15 +399,15 @@ export const recordDiscovery = internalMutation({
         discovered++
       }
     }
-    await ctx.db.patch("sideEffectJobs", job._id, {
+    await ctx.db.patch('sideEffectJobs', job._id, {
       status: 'succeeded',
       completedAt: now,
       claimToken: undefined,
       leaseExpiresAt: undefined,
       updatedAt: now,
     })
-    await ctx.db.patch("procurementRequests", request._id, {
-      researchStatus: discovered ? 'complete' : 'empty',
+    await ctx.db.patch('procurementRequests', request._id, {
+      researchStatus: usableProviders ? 'complete' : 'empty',
       candidateCounts: {
         ...request.candidateCounts,
         discovered: request.candidateCounts.discovered + discovered,
@@ -307,15 +420,25 @@ export const recordDiscovery = internalMutation({
         internal.workflows.researchCandidate,
         next,
       )
+    const rankingJobId = await queueRankingWhenInitialResearchSettles(
+      ctx,
+      request,
+      now,
+    )
     await ctx.db.insert('activityEvents', {
       requestId: request._id,
-      eventType: discovered ? 'providers_discovered' : 'research_empty',
-      safeMessage: discovered
-        ? `${discovered} providers discovered for review.`
+      eventType: usableProviders ? 'providers_discovered' : 'research_empty',
+      safeMessage: usableProviders
+        ? `${usableProviders} providers matched this request; ${discovered} were newly discovered.`
         : 'No providers were discovered. Update the request and retry research.',
       correlationId: String(job._id),
       createdAt: now,
     })
+    if (rankingJobId)
+      await ctx.scheduler.runAfter(0, internal.rankingWorkflow.rank, {
+        requestId: request._id,
+        jobId: rankingJobId,
+      })
     return null
   },
 })
@@ -325,10 +448,7 @@ export const loadCandidateForJob = internalQuery({
     jobId: v.id('sideEffectJobs'),
     claimToken: v.string(),
   },
-  returns: v.union(
-    v.null(),
-    v.object({ website: v.string() }),
-  ),
+  returns: v.union(v.null(), v.object({ website: v.string() })),
   handler: async (ctx, args) => {
     const candidate = await ctx.db.get('requestCandidates', args.candidateId)
     const job = await ctx.db.get('sideEffectJobs', args.jobId)
@@ -374,7 +494,8 @@ export const recordCandidateResearch = internalMutation({
       !candidate ||
       !job ||
       job.candidateId !== candidate._id ||
-      job.status !== 'running' || job.claimToken !== args.claimToken
+      job.status !== 'running' ||
+      job.claimToken !== args.claimToken
     )
       return null
     const request = await ctx.db.get('procurementRequests', candidate.requestId)
@@ -396,7 +517,7 @@ export const recordCandidateResearch = internalMutation({
       .map((page) => page.markdown)
       .join('\n')
       .slice(0, 40_000)
-    await ctx.db.patch("requestCandidates", candidate._id, {
+    await ctx.db.patch('requestCandidates', candidate._id, {
       status: args.pages.length ? 'qualified' : 'rejected',
       qualificationSummary: args.pages.length
         ? 'Website researched; awaiting provider response for final comparison.'
@@ -452,28 +573,31 @@ export const recordCandidateResearch = internalMutation({
           updatedAt: now,
         })
     }
-    await ctx.db.patch("sideEffectJobs", job._id, {
+    await ctx.db.patch('sideEffectJobs', job._id, {
       status: 'succeeded',
       completedAt: now,
       claimToken: undefined,
       leaseExpiresAt: undefined,
       updatedAt: now,
     })
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       status: request.status,
       candidateCounts: {
         ...request.candidateCounts,
         discovered: Math.max(0, request.candidateCounts.discovered - 1),
         qualified:
-          request.candidateCounts.qualified +
-          (args.pages.length ? 1 : 0),
+          request.candidateCounts.qualified + (args.pages.length ? 1 : 0),
         rejected:
           request.candidateCounts.rejected + (args.pages.length ? 0 : 1),
         queuedForContact: request.candidateCounts.queuedForContact,
       },
       updatedAt: now,
     })
-    const rankingJobId = await queueRankingWhenInitialResearchSettles(ctx, request, now)
+    const rankingJobId = await queueRankingWhenInitialResearchSettles(
+      ctx,
+      request,
+      now,
+    )
     await ctx.db.insert('activityEvents', {
       requestId: request._id,
       candidateId: candidate._id,
@@ -487,7 +611,10 @@ export const recordCandidateResearch = internalMutation({
       createdAt: now,
     })
     if (rankingJobId)
-      await ctx.scheduler.runAfter(0, internal.rankingWorkflow.rank, { requestId: request._id, jobId: rankingJobId })
+      await ctx.scheduler.runAfter(0, internal.rankingWorkflow.rank, {
+        requestId: request._id,
+        jobId: rankingJobId,
+      })
     return null
   },
 })
@@ -507,36 +634,63 @@ export const failCandidateResearch = internalMutation({
       !candidate ||
       !job ||
       job.candidateId !== candidate._id ||
-      job.status !== 'running' || job.claimToken !== args.claimToken
+      job.status !== 'running' ||
+      job.claimToken !== args.claimToken
     )
       return null
     const request = await ctx.db.get('procurementRequests', candidate.requestId)
     if (!request || request.version !== candidate.inputVersion) return null
     const now = Date.now()
     const retry = await ctx.runMutation(internal.sideEffectJobs.retryOrFail, {
-      jobId: job._id, claimToken: args.claimToken, retryable: args.retryable,
+      jobId: job._id,
+      claimToken: args.claimToken,
+      retryable: args.retryable,
       summary: args.summary.slice(0, 300),
     })
     if (retry) {
-      await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, { jobId: job._id, retryAt: retry.retryAt })
+      await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, {
+        jobId: job._id,
+        retryAt: retry.retryAt,
+      })
       return null
     }
     if (candidate.status === 'discovered') {
       transitionCandidate('discovered', 'researching')
       transitionCandidate('researching', 'rejected')
       await ctx.db.patch('requestCandidates', candidate._id, {
-        status: 'rejected', rejectionSummary: 'Research could not obtain usable public website evidence.',
-        version: candidate.version + 1, updatedAt: now,
+        status: 'rejected',
+        rejectionSummary:
+          'Research could not obtain usable public website evidence.',
+        version: candidate.version + 1,
+        updatedAt: now,
       })
       await ctx.db.patch('procurementRequests', request._id, {
-        candidateCounts: { ...request.candidateCounts, discovered: Math.max(0, request.candidateCounts.discovered - 1), rejected: request.candidateCounts.rejected + 1 },
+        candidateCounts: {
+          ...request.candidateCounts,
+          discovered: Math.max(0, request.candidateCounts.discovered - 1),
+          rejected: request.candidateCounts.rejected + 1,
+        },
         updatedAt: now,
       })
     }
-    const rankingJobId = await queueRankingWhenInitialResearchSettles(ctx, request, now)
-    await ctx.db.insert('activityEvents', { requestId: request._id, candidateId: candidate._id, eventType: 'candidate_rejected', safeMessage: 'A provider could not be researched from public evidence.', correlationId: String(job._id), createdAt: now })
+    const rankingJobId = await queueRankingWhenInitialResearchSettles(
+      ctx,
+      request,
+      now,
+    )
+    await ctx.db.insert('activityEvents', {
+      requestId: request._id,
+      candidateId: candidate._id,
+      eventType: 'candidate_rejected',
+      safeMessage: 'A provider could not be researched from public evidence.',
+      correlationId: String(job._id),
+      createdAt: now,
+    })
     if (rankingJobId)
-      await ctx.scheduler.runAfter(0, internal.rankingWorkflow.rank, { requestId: request._id, jobId: rankingJobId })
+      await ctx.scheduler.runAfter(0, internal.rankingWorkflow.rank, {
+        requestId: request._id,
+        jobId: rankingJobId,
+      })
     return null
   },
 })
@@ -555,20 +709,24 @@ export const failResearchJob = internalMutation({
       !request ||
       !job ||
       job.requestId !== request._id ||
-      job.status !== 'running' || job.claimToken !== args.claimToken
+      job.status !== 'running' ||
+      job.claimToken !== args.claimToken
     )
       return null
     const now = Date.now()
     const retryable =
       args.summary.startsWith('retryable_external:') &&
       job.attemptCount < (job.maxAttempts ?? 3)
-    await ctx.db.patch("sideEffectJobs", job._id, {
+    await ctx.db.patch('sideEffectJobs', job._id, {
       status: retryable ? 'retryable_failure' : 'needs_user',
       lastErrorCategory: retryable ? 'retryable_external' : 'needs_user',
       lastErrorSummary: args.summary,
       updatedAt: now,
     })
-    await ctx.db.patch("procurementRequests", request._id, { researchStatus: 'empty', updatedAt: now })
+    await ctx.db.patch('procurementRequests', request._id, {
+      researchStatus: 'empty',
+      updatedAt: now,
+    })
     await ctx.db.insert('activityEvents', {
       requestId: request._id,
       eventType: 'research_blocked',

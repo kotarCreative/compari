@@ -18,7 +18,10 @@ export type CandidateStatus =
   | 'proposal_received'
   | 'declined'
 
-const requestTransitions: Record<RequestStatus, ReadonlyArray<RequestStatus>> = {
+const requestTransitions: Record<
+  RequestStatus,
+  ReadonlyArray<RequestStatus>
+> = {
   draft: ['researching', 'cancelled'],
   researching: ['contacting', 'cancelled'],
   contacting: ['collecting_responses', 'cancelled'],
@@ -66,22 +69,64 @@ export function normalizeDomain(input: string) {
   return url.hostname.toLowerCase().replace(/^www\./, '')
 }
 export function validateBoundedJson(value: unknown) {
-  if (!isBoundedJson(value, 0)) throw new Error('validation: value has unsupported JSON structure')
+  if (!isBoundedJson(value, 0))
+    throw new Error('validation: value has unsupported JSON structure')
   let text: string
-  try { text = JSON.stringify(value) } catch { throw new Error('validation: value must be serializable') }
+  try {
+    text = JSON.stringify(value)
+  } catch {
+    throw new Error('validation: value must be serializable')
+  }
   if (text.length > 20_000) throw new Error('validation: value is too large')
   return value
 }
 function isBoundedJson(value: unknown, depth: number): boolean {
-  if (depth > 8 || value === null || typeof value === 'string' || typeof value === 'boolean') return depth <= 8 && (typeof value !== 'string' || value.length <= 8_000)
+  if (
+    depth > 8 ||
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  )
+    return depth <= 8 && (typeof value !== 'string' || value.length <= 8_000)
   if (typeof value === 'number') return Number.isFinite(value)
-  if (Array.isArray(value)) return value.length <= 100 && value.every((item) => isBoundedJson(item, depth + 1))
+  if (Array.isArray(value))
+    return (
+      value.length <= 100 &&
+      value.every((item) => isBoundedJson(item, depth + 1))
+    )
   if (typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
-    return entries.length <= 100 && entries.every(([key, item]) => key.length <= 100 && isBoundedJson(item, depth + 1))
+    return (
+      entries.length <= 100 &&
+      entries.every(
+        ([key, item]) => key.length <= 100 && isBoundedJson(item, depth + 1),
+      )
+    )
   }
   return false
 }
 export function canResearch(prompt: string) {
   return prompt.trim().length >= 12
+}
+
+export type CandidateCounts = {
+  discovered: number
+  researching: number
+  qualified: number
+  rejected: number
+  queuedForContact: number
+  contacted: number
+  responded: number
+}
+
+export function moveCandidateCount(
+  counts: CandidateCounts,
+  from: keyof CandidateCounts,
+  to: keyof CandidateCounts,
+): CandidateCounts {
+  return {
+    ...counts,
+    [from]: Math.max(0, counts[from] - 1),
+    [to]: counts[to] + 1,
+  }
 }

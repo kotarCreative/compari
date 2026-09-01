@@ -55,6 +55,9 @@ export const execute = internalAction({
         ...args,
         claimToken: claim.claimToken,
         messageId: result.messageId,
+        threadId: result.threadId,
+        subject: payload.subject,
+        body: payload.body,
       })
     } catch (error) {
       const failure = classifyExternalError(error)

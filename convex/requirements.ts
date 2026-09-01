@@ -9,27 +9,44 @@ import type { Id } from './_generated/dataModel'
 
 const workflow = internal as unknown as {
   workflows: {
-    extractRequirements: FunctionReference<'action', 'internal', {
-      requestId: Id<'procurementRequests'>; jobId: Id<'sideEffectJobs'>
-    }, null>
+    extractRequirements: FunctionReference<
+      'action',
+      'internal',
+      {
+        requestId: Id<'procurementRequests'>
+        jobId: Id<'sideEffectJobs'>
+      },
+      null
+    >
   }
 }
 
 async function queueRefresh(
   ctx: MutationCtx,
-  request: { _id: Id<'procurementRequests'>; userId: Id<'users'>; version: number },
+  request: {
+    _id: Id<'procurementRequests'>
+    userId: Id<'users'>
+    version: number
+  },
   now: number,
 ) {
   const nextVersion = request.version + 1
   const jobId = await ctx.db.insert('sideEffectJobs', {
-    userId: request.userId, kind: 'extract_requirements',
+    userId: request.userId,
+    kind: 'extract_requirements',
     idempotencyKey: `extract-requirements:${request._id}:v${nextVersion}`,
-    status: 'pending', attemptCount: 0, maxAttempts: 3,
-    requestId: request._id, inputVersion: nextVersion, scheduledAt: now,
-    createdAt: now, updatedAt: now,
+    status: 'pending',
+    attemptCount: 0,
+    maxAttempts: 3,
+    requestId: request._id,
+    inputVersion: nextVersion,
+    scheduledAt: now,
+    createdAt: now,
+    updatedAt: now,
   })
   await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
-    requestId: request._id, jobId,
+    requestId: request._id,
+    jobId,
   })
 }
 
@@ -58,10 +75,25 @@ export const list = query({
   ),
   handler: async (ctx, args) => {
     await requireOwnedRequest(ctx, args.requestId)
-    return await ctx.db
+    const requirements = await ctx.db
       .query('requirements')
       .withIndex('by_request_id', (q) => q.eq('requestId', args.requestId))
       .take(100)
+    return requirements.map((requirement) => ({
+      _id: requirement._id,
+      requestId: requirement.requestId,
+      key: requirement.key,
+      label: requirement.label,
+      value: requirement.value,
+      kind: requirement.kind,
+      source: requirement.source,
+      ...(requirement.importance === undefined
+        ? {}
+        : { importance: requirement.importance }),
+      confidence: requirement.confidence,
+      createdAt: requirement.createdAt,
+      updatedAt: requirement.updatedAt,
+    }))
   },
 })
 export const upsert = mutation({
@@ -96,14 +128,14 @@ export const upsert = mutation({
       updatedAt: now,
     }
     const id = existing
-      ? (await ctx.db.patch("requirements", existing._id, patch), existing._id)
+      ? (await ctx.db.patch('requirements', existing._id, patch), existing._id)
       : await ctx.db.insert('requirements', {
           requestId: request._id,
           key: args.key,
           ...patch,
           createdAt: now,
         })
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       version: request.version + 1,
       updatedAt: now,
     })
@@ -118,9 +150,9 @@ export const remove = mutation({
     const requirement = await ctx.db.get('requirements', args.requirementId)
     if (!requirement) throw new Error('validation: requirement does not exist')
     const { request } = await requireOwnedRequest(ctx, requirement.requestId)
-    await ctx.db.delete("requirements", requirement._id)
+    await ctx.db.delete('requirements', requirement._id)
     const now = Date.now()
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       version: request.version + 1,
       updatedAt: now,
     })

@@ -10,7 +10,11 @@ declare const process: { env: Record<string, string | undefined> }
 export const mode = action({
   args: {},
   returns: v.boolean(),
-  handler: () => process.env.COMPARI_DEMO_MODE === 'true',
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new Error('authorization: authentication required')
+    return process.env.COMPARI_DEMO_MODE === 'true'
+  },
 })
 
 export const run = internalAction({

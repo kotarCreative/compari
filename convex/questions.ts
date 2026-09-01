@@ -8,9 +8,15 @@ import type { Id } from './_generated/dataModel'
 
 const workflow = internal as unknown as {
   workflows: {
-    extractRequirements: FunctionReference<'action', 'internal', {
-      requestId: Id<'procurementRequests'>; jobId: Id<'sideEffectJobs'>
-    }, null>
+    extractRequirements: FunctionReference<
+      'action',
+      'internal',
+      {
+        requestId: Id<'procurementRequests'>
+        jobId: Id<'sideEffectJobs'>
+      },
+      null
+    >
   }
 }
 
@@ -32,10 +38,18 @@ export const list = query({
   ),
   handler: async (ctx, args) => {
     await requireOwnedRequest(ctx, args.requestId)
-    return await ctx.db
+    const questions = await ctx.db
       .query('questions')
       .withIndex('by_request_id', (q) => q.eq('requestId', args.requestId))
       .take(100)
+    return questions.map((question) => ({
+      _id: question._id,
+      requestId: question.requestId,
+      text: question.text,
+      importance: question.importance,
+      status: question.status,
+      ...(question.answer === undefined ? {} : { answer: question.answer }),
+    }))
   },
 })
 export const answerForRequest = mutation({
@@ -45,46 +59,76 @@ export const answerForRequest = mutation({
     const question = await ctx.db.get('questions', args.questionId)
     if (!question) throw new Error('validation: question does not exist')
     const { request } = await requireOwnedRequest(ctx, question.requestId)
-    if (question.status !== 'open') throw new Error('validation: question has already been answered')
+    if (question.status !== 'open')
+      throw new Error('validation: question has already been answered')
     const answer = args.answer.trim()
     if (!answer || answer.length > 4_000)
       throw new Error('validation: answer is required')
     const now = Date.now()
     const factId = await ctx.db.insert('facts', {
-      requestId: request._id, candidateId: question.candidateId, key: `buyer_answer:${question._id}`, label: 'Buyer-provided answer', value: { schemaVersion: 1, value: answer }, sourceType: 'user', sourceReference: {}, confidence: 1, observedAt: now, createdAt: now,
+      requestId: request._id,
+      candidateId: question.candidateId,
+      key: `buyer_answer:${question._id}`,
+      label: 'Buyer-provided answer',
+      value: { schemaVersion: 1, value: answer },
+      sourceType: 'user',
+      sourceReference: {},
+      confidence: 1,
+      observedAt: now,
+      createdAt: now,
     })
-    await ctx.db.patch("questions", question._id, {
+    await ctx.db.patch('questions', question._id, {
       answer,
       status: 'answered',
       supportingFactIds: [...question.supportingFactIds, factId],
       updatedAt: now,
     })
     const nextVersion = request.version + 1
-    await ctx.db.patch("procurementRequests", request._id, {
+    await ctx.db.patch('procurementRequests', request._id, {
       version: nextVersion,
       updatedAt: now,
     })
     const jobId = await ctx.db.insert('sideEffectJobs', {
-      userId: request.userId, kind: 'extract_requirements',
+      userId: request.userId,
+      kind: 'extract_requirements',
       idempotencyKey: `extract-requirements:${request._id}:v${nextVersion}`,
-      status: 'pending', attemptCount: 0, maxAttempts: 3,
-      requestId: request._id, inputVersion: nextVersion, scheduledAt: now,
-      createdAt: now, updatedAt: now,
+      status: 'pending',
+      attemptCount: 0,
+      maxAttempts: 3,
+      requestId: request._id,
+      inputVersion: nextVersion,
+      scheduledAt: now,
+      createdAt: now,
+      updatedAt: now,
     })
     await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
-      requestId: request._id, jobId,
+      requestId: request._id,
+      jobId,
     })
     if (question.providerMessageId && question.candidateId) {
       const followUpJobId = await ctx.db.insert('sideEffectJobs', {
-        userId: request.userId, kind: 'send_follow_up',
-        idempotencyKey: followUpIdempotencyKey(question._id), status: 'pending',
-        attemptCount: 0, maxAttempts: 3, requestId: request._id,
-        candidateId: question.candidateId, questionId: question._id,
-        inputVersion: nextVersion, scheduledAt: now, createdAt: now, updatedAt: now,
+        userId: request.userId,
+        kind: 'send_follow_up',
+        idempotencyKey: followUpIdempotencyKey(question._id),
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: 3,
+        requestId: request._id,
+        candidateId: question.candidateId,
+        questionId: question._id,
+        inputVersion: nextVersion,
+        scheduledAt: now,
+        createdAt: now,
+        updatedAt: now,
       })
-      await ctx.scheduler.runAfter(0, internal.followUps.sendForAnsweredQuestion, {
-        questionId: question._id, jobId: followUpJobId,
-      })
+      await ctx.scheduler.runAfter(
+        0,
+        internal.followUps.sendForAnsweredQuestion,
+        {
+          questionId: question._id,
+          jobId: followUpJobId,
+        },
+      )
     }
     return null
   },

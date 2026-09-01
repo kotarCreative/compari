@@ -13,18 +13,26 @@ export const extractRequirements = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, { jobId: args.jobId, kind: 'extract_requirements' })
+    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, {
+      jobId: args.jobId,
+      kind: 'extract_requirements',
+    })
     if (!claim) return null
     const request = await ctx.runQuery(
       internal.workflowState.loadRequestForJob,
       { ...args, claimToken: claim.claimToken },
     )
-    if (!request || request.automationPaused || request.status === 'cancelled') {
+    if (
+      !request ||
+      request.automationPaused ||
+      request.status === 'cancelled'
+    ) {
       await ctx.runMutation(internal.sideEffectJobs.retryOrFail, {
         jobId: args.jobId,
         claimToken: claim.claimToken,
         retryable: false,
-        summary: 'permanent: requirement extraction input is stale or unavailable',
+        summary:
+          'permanent: requirement extraction input is stale or unavailable',
       })
       return null
     }
@@ -35,13 +43,26 @@ export const extractRequirements = internalAction({
         corrections: request.corrections,
       })
       await ctx.runMutation(internal.workflowState.completeIntake, {
-        ...args, claimToken: claim.claimToken, output,
+        ...args,
+        claimToken: claim.claimToken,
+        output,
       })
     } catch (error) {
-      const summary = error instanceof Error ? error.message.slice(0, 300) : 'requirement extraction failed'
-      await ctx.runMutation(internal.sideEffectJobs.retryOrFail, {
-        jobId: args.jobId, claimToken: claim.claimToken, retryable: /^retryable_external:/i.test(summary), summary,
-      })
+      const classified = classifyExternalError(error)
+      const failure = await ctx.runMutation(
+        internal.sideEffectJobs.retryOrFail,
+        {
+          jobId: args.jobId,
+          claimToken: claim.claimToken,
+          retryable: classified.retryable,
+          summary: classified.summary,
+        },
+      )
+      if (failure?.retryAt)
+        await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, {
+          jobId: args.jobId,
+          retryAt: failure.retryAt,
+        })
     }
     return null
   },
@@ -53,7 +74,10 @@ export const discoverProviders = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, { jobId: args.jobId, kind: 'discover_providers' })
+    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, {
+      jobId: args.jobId,
+      kind: 'discover_providers',
+    })
     if (!claim) return null
     const request = await ctx.runQuery(
       internal.workflowState.loadRequestForJob,
@@ -79,16 +103,26 @@ export const discoverProviders = internalAction({
         limit: 10,
       })
       await ctx.runMutation(internal.workflowState.recordDiscovery, {
-        ...args, claimToken: claim.claimToken,
+        ...args,
+        claimToken: claim.claimToken,
         results,
       })
     } catch (error) {
       const classified = classifyExternalError(error)
-      const failure = await ctx.runMutation(internal.sideEffectJobs.retryOrFail, {
-        jobId: args.jobId, claimToken: claim.claimToken, retryable: classified.retryable, summary: classified.summary,
-      })
+      const failure = await ctx.runMutation(
+        internal.sideEffectJobs.retryOrFail,
+        {
+          jobId: args.jobId,
+          claimToken: claim.claimToken,
+          retryable: classified.retryable,
+          summary: classified.summary,
+        },
+      )
       if (failure?.retryAt)
-        await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, { jobId: args.jobId, retryAt: failure.retryAt })
+        await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, {
+          jobId: args.jobId,
+          retryAt: failure.retryAt,
+        })
     }
     return null
   },
@@ -100,7 +134,10 @@ export const researchCandidate = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, { jobId: args.jobId, kind: 'research_candidate' })
+    const claim = await ctx.runMutation(internal.sideEffectJobs.claim, {
+      jobId: args.jobId,
+      kind: 'research_candidate',
+    })
     if (!claim) return null
     const candidate = await ctx.runQuery(
       internal.workflowState.loadCandidateForJob,
@@ -121,13 +158,17 @@ export const researchCandidate = internalAction({
         limit: 5,
       })
       await ctx.runMutation(internal.workflowState.recordCandidateResearch, {
-        ...args, claimToken: claim.claimToken,
+        ...args,
+        claimToken: claim.claimToken,
         pages,
       })
     } catch (error) {
       const classified = classifyExternalError(error)
       await ctx.runMutation(internal.workflowState.failCandidateResearch, {
-        ...args, claimToken: claim.claimToken, retryable: classified.retryable, summary: classified.summary,
+        ...args,
+        claimToken: claim.claimToken,
+        retryable: classified.retryable,
+        summary: classified.summary,
       })
     }
     return null
