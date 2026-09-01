@@ -134,8 +134,10 @@ export const retryMyInboxProvisioning = mutation({
     })
     await ctx.db.patch('sideEffectJobs', job._id, {
       status: 'pending',
+      attemptCount: 0,
       lastErrorCategory: undefined,
       lastErrorSummary: undefined,
+      scheduledAt: now,
       updatedAt: now,
     })
     await ctx.scheduler.runAfter(

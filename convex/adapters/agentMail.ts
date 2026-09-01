@@ -1,78 +1,188 @@
 'use node'
+import { AgentMailClient } from 'agentmail'
+import { isDemoMode, requireDeploymentEnv } from './runtime.ts'
 import type {
   AgentMailPort,
   ProvisionInboxInput,
   ProvisionedInbox,
 } from '../ports/agentMail'
 
-declare const process: { env: Record<string, string | undefined> }
+const AGENTMAIL_POD_NAME = 'demo'
 
 let port: AgentMailPort | undefined
 export function getAgentMailPort(): AgentMailPort {
-  port ??= process.env.COMPARI_DEMO_MODE === 'true' ? new DemoAgentMailAdapter() : new AgentMailHttpAdapter()
+  port ??= isDemoMode() ? new DemoAgentMailAdapter() : new AgentMailSdkAdapter()
   return port
 }
 
 /** Deterministic local fixture; it never opens a network connection. */
 class DemoAgentMailAdapter implements AgentMailPort {
   provisionInbox(input: ProvisionInboxInput): Promise<ProvisionedInbox> {
-    return Promise.resolve({ inboxId: `demo-inbox-${input.clientId}`, emailAddress: `${input.username || 'buyer'}@demo.agentmail.test` })
+    return Promise.resolve({
+      inboxId: `demo-inbox-${input.clientId}`,
+      emailAddress: `${input.username || 'buyer'}@demo.agentmail.test`,
+    })
   }
-  sendMessage(input: { idempotencyKey: string }): Promise<{ messageId: string }> {
-    return Promise.resolve({ messageId: `demo-outreach-${stableId(input.idempotencyKey)}` })
+  sendMessage(input: {
+    idempotencyKey: string
+  }): Promise<{ messageId: string; threadId: string }> {
+    return Promise.resolve({
+      messageId: `demo-outreach-${stableId(input.idempotencyKey)}`,
+      threadId: `demo-thread-${stableId(input.idempotencyKey)}`,
+    })
   }
-  replyToMessage(input: { idempotencyKey: string; parentMessageId: string }): Promise<{ messageId: string }> {
-    return Promise.resolve({ messageId: `demo-reply-${stableId(`${input.parentMessageId}:${input.idempotencyKey}`)}` })
+  replyToMessage(input: {
+    idempotencyKey: string
+    parentMessageId: string
+  }): Promise<{ messageId: string; threadId: string }> {
+    return Promise.resolve({
+      messageId: `demo-reply-${stableId(`${input.parentMessageId}:${input.idempotencyKey}`)}`,
+      threadId: `demo-thread-${stableId(input.parentMessageId)}`,
+    })
+  }
+  getMessage(input: { inboxId: string; messageId: string }) {
+    return Promise.resolve({
+      threadId: `demo-thread-${stableId(input.messageId)}`,
+      sender: 'provider@demo.agentmail.test',
+      subject: 'Demo provider reply',
+      body: 'Demo provider response.',
+      occurredAt: Date.now(),
+      attachments: [],
+    })
   }
 }
 
-class AgentMailHttpAdapter implements AgentMailPort {
+export class AgentMailSdkAdapter implements AgentMailPort {
+  private readonly clientFactory: () => AgentMailClient
+  private podIdPromise: Promise<string> | undefined
+
+  constructor(
+    clientFactory: () => AgentMailClient = () => {
+      const apiKey = requireDeploymentEnv(
+        'AGENTMAIL_API_KEY',
+        'AgentMail credentials are missing',
+      )
+      return new AgentMailClient({ apiKey, maxRetries: 2 })
+    },
+  ) {
+    this.clientFactory = clientFactory
+  }
+
+  private client(): AgentMailClient {
+    return this.clientFactory()
+  }
+
+  private podId(): Promise<string> {
+    this.podIdPromise ??= this.findPodId()
+    return this.podIdPromise
+  }
+
+  private async findPodId(): Promise<string> {
+    const client = this.client()
+    const matchingPodIds: Array<string> = []
+    let pageToken: string | undefined
+    do {
+      const page = await client.pods.list({
+        limit: 100,
+        ...(pageToken === undefined ? {} : { pageToken }),
+      })
+      matchingPodIds.push(
+        ...page.pods
+          .filter(
+            (pod) =>
+              pod.name.trim().toLowerCase() ===
+              AGENTMAIL_POD_NAME.toLowerCase(),
+          )
+          .map((pod) => pod.podId),
+      )
+      pageToken = page.nextPageToken
+    } while (pageToken !== undefined)
+
+    if (matchingPodIds.length === 0)
+      throw new Error(`AgentMail pod "${AGENTMAIL_POD_NAME}" was not found`)
+    if (matchingPodIds.length > 1)
+      throw new Error(
+        `Multiple AgentMail pods are named "${AGENTMAIL_POD_NAME}"`,
+      )
+    return matchingPodIds[0]
+  }
+
   async provisionInbox(input: ProvisionInboxInput): Promise<ProvisionedInbox> {
-    const apiKey = process.env.AGENTMAIL_API_KEY
-    if (!apiKey) throw new Error('AgentMail credentials are missing')
-    const response = await fetch('https://api.agentmail.to/v0/inboxes', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: input.username,
-        displayName: input.displayName,
-        clientId: input.clientId,
-      }),
+    const client = this.client()
+    const inbox = await client.pods.inboxes.create(await this.podId(), {
+      username: input.username,
+      displayName: input.displayName,
+      clientId: input.clientId,
     })
-    const payload: unknown = await response.json().catch(() => null)
-    if (!response.ok)
-      throw new Error(`AgentMail inbox creation failed (${response.status})`)
-    if (!isProvisionedInbox(payload))
-      throw new Error('AgentMail returned an invalid inbox response')
-    return payload
+    return { inboxId: inbox.inboxId, emailAddress: inbox.email }
   }
-  sendMessage(): Promise<never> {
-    // Do not guess an idempotency API for sends. Specs require reconciliation
-    // before retrying an uncertain email, so this remains fail-closed until the
-    // AgentMail SDK and its supported correlation primitive are installed.
-    return Promise.reject(
-      new Error('needs_user: outbound AgentMail delivery is not configured'),
+
+  async sendMessage(input: {
+    inboxId: string
+    to: string
+    subject: string
+    text: string
+    idempotencyKey: string
+  }) {
+    const sent = await this.client().inboxes.messages.send(
+      input.inboxId,
+      { to: [input.to], subject: input.subject, text: input.text },
+      { idempotencyKey: input.idempotencyKey },
     )
+    return { messageId: sent.messageId, threadId: sent.threadId }
   }
-  replyToMessage(): Promise<never> {
-    return Promise.reject(
-      new Error('needs_user: AgentMail reply reconciliation is not configured'),
+
+  async replyToMessage(input: {
+    inboxId: string
+    parentMessageId: string
+    text: string
+    idempotencyKey: string
+  }) {
+    const sent = await this.client().inboxes.messages.reply(
+      input.inboxId,
+      input.parentMessageId,
+      { text: input.text },
+      { idempotencyKey: input.idempotencyKey },
     )
+    return { messageId: sent.messageId, threadId: sent.threadId }
+  }
+
+  async getMessage(input: { inboxId: string; messageId: string }) {
+    const message = await this.client().inboxes.messages.get(
+      input.inboxId,
+      input.messageId,
+    )
+    const body =
+      message.extractedText ??
+      message.text ??
+      message.extractedHtml ??
+      message.html ??
+      ''
+    return {
+      threadId: message.threadId,
+      sender: message.from,
+      subject: message.subject ?? '(no subject)',
+      body: body.slice(0, 40_000),
+      occurredAt: message.timestamp.getTime(),
+      attachments: (message.attachments ?? [])
+        .slice(0, 20)
+        .map((attachment) => ({
+          id: attachment.attachmentId,
+          ...(attachment.filename === undefined
+            ? {}
+            : { filename: attachment.filename }),
+          ...(attachment.contentType === undefined
+            ? {}
+            : { contentType: attachment.contentType }),
+          size: attachment.size,
+        })),
+    }
   }
 }
-function isProvisionedInbox(value: unknown): value is ProvisionedInbox {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as Record<string, unknown>).inboxId === 'string' &&
-    typeof (value as Record<string, unknown>).emailAddress === 'string'
-  )
-}
+
 function stableId(value: string) {
   let hash = 2166136261
-  for (const char of value) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619)
+  for (const char of value)
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619)
   return (hash >>> 0).toString(36)
 }

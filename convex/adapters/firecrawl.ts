@@ -1,55 +1,81 @@
 'use node'
+import {
+  isDemoMode,
+  isRetryableHttpStatus,
+  requireDeploymentEnv,
+} from './runtime.ts'
 import type {
   ProviderSearchResult,
   ResearchPage,
   WebResearchPort,
 } from '../ports/webResearch'
 
-declare const process: { env: Record<string, string | undefined> }
 let port: WebResearchPort | undefined
 export function getWebResearchPort(): WebResearchPort {
-  port ??= process.env.COMPARI_DEMO_MODE === 'true' ? new DemoWebResearchAdapter() : new FirecrawlAdapter()
+  port ??= isDemoMode() ? new DemoWebResearchAdapter() : new FirecrawlAdapter()
   return port
 }
 /** Deterministic fixtures, isolated behind the same research port as production. */
 class DemoWebResearchAdapter implements WebResearchPort {
   searchProviders(): Promise<Array<ProviderSearchResult>> {
-    return Promise.resolve(['northline', 'prairie', 'rivercity'].map((name) => ({ name: `${name[0].toUpperCase()}${name.slice(1)} Print`, url: `https://${name}.demo.test` })))
+    return Promise.resolve(
+      ['northline', 'prairie', 'rivercity'].map((name) => ({
+        name: `${name[0].toUpperCase()}${name.slice(1)} Print`,
+        url: `https://${name}.demo.test`,
+      })),
+    )
   }
   researchProvider(input: { url: string }): Promise<Array<ResearchPage>> {
-    return Promise.resolve([{ url: input.url, title: 'Demo print provider', markdown: 'Public demo fixture. Contact sales@example.demo.test for factual quote details.' }])
+    return Promise.resolve([
+      {
+        url: input.url,
+        title: 'Demo print provider',
+        markdown:
+          'Public demo fixture. Contact sales@example.demo.test for factual quote details.',
+      },
+    ])
   }
-  submitContactForm(input: { idempotencyKey: string }): Promise<{ submissionId: string }> {
-    return Promise.resolve({ submissionId: `demo-form-${input.idempotencyKey.slice(0, 80)}` })
+  submitContactForm(input: {
+    idempotencyKey: string
+  }): Promise<{ submissionId: string }> {
+    return Promise.resolve({
+      submissionId: `demo-form-${input.idempotencyKey.slice(0, 80)}`,
+    })
   }
 }
 class FirecrawlAdapter implements WebResearchPort {
   private key() {
-    const key = process.env.FIRECRAWL_API_KEY
-    if (!key) throw new Error('permanent_external: Firecrawl is not configured')
-    return key
+    return requireDeploymentEnv(
+      'FIRECRAWL_API_KEY',
+      'permanent_external: Firecrawl is not configured',
+    )
   }
   async searchProviders(input: {
     query: string
     location?: string
     limit: number
   }): Promise<Array<ProviderSearchResult>> {
-    const response = await fetch('https://api.firecrawl.dev/v2/search', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.key()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: [input.query, input.location].filter(Boolean).join(' '),
-        limit: Math.min(input.limit, 12),
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch('https://api.firecrawl.dev/v2/search', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.key()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: [input.query, input.location].filter(Boolean).join(' '),
+          limit: Math.min(input.limit, 12),
+        }),
+      })
+    } catch {
+      throw new Error('retryable_external: Firecrawl discovery is unreachable')
+    }
     const payload: unknown = await response.json().catch(() => null)
     if (!response.ok)
       throw new Error(
-        response.status === 429
-          ? 'retryable_external: Firecrawl rate limited discovery'
+        isRetryableHttpStatus(response.status)
+          ? 'retryable_external: Firecrawl discovery is temporarily unavailable'
           : `permanent_external: Firecrawl search failed (${response.status})`,
       )
     const rows =
@@ -84,23 +110,28 @@ class FirecrawlAdapter implements WebResearchPort {
     url: string
     limit: number
   }): Promise<Array<ResearchPage>> {
-    const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.key()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: input.url,
-        formats: ['markdown'],
-        onlyMainContent: true,
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch('https://api.firecrawl.dev/v2/scrape', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.key()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: input.url,
+          formats: ['markdown'],
+          onlyMainContent: true,
+        }),
+      })
+    } catch {
+      throw new Error('retryable_external: Firecrawl research is unreachable')
+    }
     const payload: unknown = await response.json().catch(() => null)
     if (!response.ok)
       throw new Error(
-        response.status === 429
-          ? 'retryable_external: Firecrawl rate limited research'
+        isRetryableHttpStatus(response.status)
+          ? 'retryable_external: Firecrawl research is temporarily unavailable'
           : `permanent_external: Firecrawl scrape failed (${response.status})`,
       )
     const data =

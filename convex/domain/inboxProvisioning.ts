@@ -47,11 +47,31 @@ export function safeExternalError(error: unknown): {
   category: 'retryable_external' | 'permanent_external'
   summary: string
 } {
+  const statusCode =
+    typeof error === 'object' &&
+    error !== null &&
+    typeof (error as { statusCode?: unknown }).statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : undefined
   const message =
     error instanceof Error
       ? error.message.toLowerCase()
       : 'unknown external failure'
+  if (message.includes('agentmail pod "demo" was not found'))
+    return {
+      category: 'permanent_external',
+      summary: 'AgentMail pod "demo" was not found.',
+    }
+  if (message.includes('multiple agentmail pods are named "demo"'))
+    return {
+      category: 'permanent_external',
+      summary: 'More than one AgentMail pod is named "demo".',
+    }
   if (
+    statusCode === 408 ||
+    statusCode === 409 ||
+    statusCode === 429 ||
+    (statusCode !== undefined && statusCode >= 500) ||
     message.includes('429') ||
     message.includes('timeout') ||
     message.includes('temporar')
@@ -61,6 +81,8 @@ export function safeExternalError(error: unknown): {
       summary: 'Inbox provider is temporarily unavailable.',
     }
   if (
+    statusCode === 401 ||
+    statusCode === 403 ||
     message.includes('credential') ||
     message.includes('api key') ||
     message.includes('401') ||
@@ -69,6 +91,16 @@ export function safeExternalError(error: unknown): {
     return {
       category: 'permanent_external',
       summary: 'Inbox provider credentials need attention.',
+    }
+  if (statusCode === 404)
+    return {
+      category: 'permanent_external',
+      summary: 'AgentMail pod "demo" could not be accessed.',
+    }
+  if (statusCode === 400 || statusCode === 422)
+    return {
+      category: 'permanent_external',
+      summary: 'AgentMail rejected the inbox details for pod "demo".',
     }
   return {
     category: 'permanent_external',
