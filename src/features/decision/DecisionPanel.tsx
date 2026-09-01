@@ -1,87 +1,12 @@
 import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
-import { api } from '../../../convex/_generated/api'
+import { decisionApi } from './contracts'
 import { ViewRenderer } from './ViewRenderer'
-import type { FunctionReference } from 'convex/server'
-
-type Json = { schemaVersion: 1; value: unknown }
-type EvaluationData = {
-  evaluation: { recommendation: string; inputVersion: number } | null
-  views: Array<{
-    _id: string
-    label: string
-    viewType: string
-    configuration: {
-      value?: {
-        explanation?: string
-        metricKeys?: Array<string>
-        candidateIds?: Array<string>
-      }
-    }
-  }>
-}
-type Proposal = {
-  _id: string
-  candidateId: string
-  status: string
-  summary: string
-  confidence: number
-  version: number
-  attributes: Json
-}
-type Provider = { id: string; name: string; factLabels: Array<string> }
-const decisionApi = api as unknown as {
-  evaluations: {
-    list: FunctionReference<
-      'query',
-      'public',
-      { requestId: string },
-      EvaluationData
-    >
-    reconfigure: FunctionReference<
-      'mutation',
-      'public',
-      { requestId: string; instruction: string },
-      null
-    >
-  }
-  proposals: {
-    list: FunctionReference<
-      'query',
-      'public',
-      { requestId: string },
-      Array<Proposal>
-    >
-  }
-  selections: {
-    confirmChoice: FunctionReference<
-      'mutation',
-      'public',
-      {
-        requestId: string
-        candidateId: string
-        proposalId: string
-        proposalVersion: number
-      },
-      null
-    >
-  }
-  diagnostics: {
-    getRequest: FunctionReference<
-      'query',
-      'public',
-      { requestId: string },
-      {
-        jobs: Array<{
-          _id: string
-          kind: string
-          status: string
-          lastErrorSummary?: string
-        }>
-      }
-    >
-  }
-}
+import type {
+  DecisionProposal as Proposal,
+  DecisionProvider as Provider,
+} from './contracts'
+import { Alert, Button, Input } from '~/components/ui'
 
 export function DecisionPanel({
   requestId,
@@ -127,20 +52,21 @@ export function DecisionPanel({
             .catch(() => setError('Could not update comparison preferences.'))
         }}
       >
-        <input
-          className="min-w-0 flex-1 rounded border border-slate-300 bg-transparent px-2 py-1 text-sm"
+        <Input
+          className="min-w-0 flex-1"
           value={instruction}
           onChange={(event) => setInstruction(event.target.value)}
           placeholder="e.g. ignore price and show delivery timing"
           maxLength={500}
         />
-        <button
-          className="rounded border px-2 text-sm"
+        <Button
           disabled={!instruction.trim()}
+          size="sm"
           type="submit"
+          variant="outline"
         >
           Update lenses
-        </button>
+        </Button>
       </form>
       {status === 'awaiting_selection' ? (
         <div className="space-y-3 rounded border border-sky-300 p-3 text-sm">
@@ -169,7 +95,7 @@ export function DecisionPanel({
           )}
         </div>
       ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <Alert variant="destructive">{error}</Alert> : null}
       <details className="text-xs text-slate-500">
         <summary>Request diagnostics ({status})</summary>
         <ul className="mt-2 list-disc pl-4">
@@ -242,8 +168,8 @@ function ConfirmationCard({
           ? `Evidence on file: ${provider.factLabels.join(', ')}.`
           : 'No linked website fact is available yet.'}
       </p>
-      <button
-        className="mt-3 rounded border px-2 py-1 text-xs"
+      <Button
+        className="mt-3"
         onClick={() =>
           void confirmChoice({
             requestId,
@@ -254,10 +180,11 @@ function ConfirmationCard({
             onError('This option changed; review the latest proposal.'),
           )
         }
-        type="button"
+        size="sm"
+        variant="outline"
       >
         Confirm this current proposal
-      </button>
+      </Button>
     </article>
   )
 }

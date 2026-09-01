@@ -2,6 +2,7 @@ import { useAction, useMutation } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReference } from 'convex/server'
+import { Alert, Button } from '~/components/ui'
 
 const demoApi = api as unknown as {
   demoActions: {
@@ -23,17 +24,17 @@ export function DemoModeBanner() {
   }, [mode])
   if (!enabled) return null
   return (
-    <aside className="mt-4 rounded border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950">
+    <Alert className="mt-4">
       <strong>Demo mode</strong> — deterministic fixtures only; no real provider
       is contacted.{' '}
-      <button
-        className="ml-2 underline"
+      <Button
+        className="ml-2 h-auto p-0"
         disabled={started}
         onClick={() => void start({}).then(() => setStarted(true))}
-        type="button"
+        variant="link"
       >
         {started ? 'Starting demo…' : 'Run printing demo'}
-      </button>
-    </aside>
+      </Button>
+    </Alert>
   )
 }

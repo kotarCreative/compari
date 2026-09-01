@@ -1,222 +1,19 @@
 import { useMutation, useQuery } from 'convex/react'
 import { useMemo, useState } from 'react'
-import { api } from '../../../convex/_generated/api'
 import { DecisionPanel } from '../decision/DecisionPanel'
+import { ResearchSummary, WorkflowNotice } from './components/RequestOverview'
+import { productApi } from './contracts'
 import { EvidenceDrawer } from './EvidenceDrawer'
 import { safeEvidenceUrl } from './evidencePolicy'
+import type {
+  RequestDetailValue as Detail,
+  Proposal,
+  RequestDiagnostics,
+} from './contracts'
 import type { EvidenceItem } from './EvidenceDrawer'
 import type { FormEvent } from 'react'
-import type { FunctionReference } from 'convex/server'
-
-type Json = { schemaVersion: 1; value: unknown }
-type Detail = {
-  request: {
-    _id: string
-    prompt: string
-    title: string
-    location?: string
-    status: string
-    automationPaused: boolean
-    version: number
-    researchStatus: string
-    rankingStatus?: string
-    rankingError?: string
-    rankingVersion?: number
-    candidateCounts: {
-      discovered: number
-      researching: number
-      qualified: number
-      rejected: number
-      queuedForContact: number
-      contacted: number
-      responded: number
-    }
-  }
-  requirements: Array<{
-    _id: string
-    key: string
-    label: string
-    value: Json
-    kind: 'hard_constraint' | 'preference' | 'information'
-    source: string
-    importance?: number
-    confidence: number
-  }>
-  questions: Array<{
-    _id: string
-    candidateId?: string
-    text: string
-    importance: string
-    status: string
-    answer?: string
-  }>
-  candidates: Array<{
-    _id: string
-    name: string
-    website: string
-    status: string
-    qualificationSummary?: string
-    rejectionSummary?: string
-    shortlistReason?: string
-    recommendationStatus?: string
-    recommendationScore?: number
-    recommendationReason?: string
-    recommendationCaveats?: Array<string>
-    endpoints: Array<{
-      _id: string
-      type: string
-      value: string
-      verificationState: string
-      evidenceUrl: string
-    }>
-    facts: Array<{
-      _id: string
-      key: string
-      label: string
-      value: Json
-      sourceType: string
-      sourceUrl?: string
-      excerpt?: string
-      confidence: number
-      observedAt: number
-    }>
-  }>
-  outreach: Array<{
-    _id: string
-    candidateId: string
-    method: string
-    status: string
-    contentSummary: string
-    safeError?: string
-    updatedAt: number
-  }>
-  conversations: Array<{
-    _id: string
-    candidateId: string
-    status: string
-    lastMessageAt?: number
-    messages: Array<{
-      _id: string
-      direction: string
-      participants: Array<string>
-      subject: string
-      sanitizedBody: string
-      occurredAt: number
-      agentMailMessageId: string
-    }>
-  }>
-}
-type Proposal = {
-  _id: string
-  candidateId: string
-  status: string
-  summary: string
-  confidence: number
-  version: number
-  attributes: Json
-}
-const productApi = api as unknown as {
-  requestDetails: {
-    get: FunctionReference<'query', 'public', { requestId: string }, Detail>
-  }
-  requirements: {
-    upsert: FunctionReference<
-      'mutation',
-      'public',
-      {
-        requestId: string
-        key: string
-        label: string
-        value: Json
-        kind: 'hard_constraint' | 'preference' | 'information'
-        importance?: number
-      },
-      string
-    >
-    remove: FunctionReference<
-      'mutation',
-      'public',
-      { requirementId: string },
-      null
-    >
-  }
-  questions: {
-    answerForRequest: FunctionReference<
-      'mutation',
-      'public',
-      { questionId: string; answer: string },
-      null
-    >
-  }
-  requests: {
-    pauseAutomation: FunctionReference<
-      'mutation',
-      'public',
-      { requestId: string },
-      null
-    >
-    resumeAutomation: FunctionReference<
-      'mutation',
-      'public',
-      { requestId: string },
-      null
-    >
-    cancel: FunctionReference<'mutation', 'public', { requestId: string }, null>
-  }
-  outreach: {
-    selectCandidates: FunctionReference<'mutation', 'public', { requestId: string; candidateIds: Array<string> }, null>
-    retryFailed: FunctionReference<
-      'mutation',
-      'public',
-      { attemptId: string },
-      null
-    >
-  }
-  proposals: {
-    list: FunctionReference<
-      'query',
-      'public',
-      { requestId: string },
-      Array<Proposal>
-    >
-  }
-  diagnostics: {
-    getRequest: FunctionReference<
-      'query',
-      'public',
-      { requestId: string },
-      {
-        requestStatus: string
-        candidates: Array<{
-          _id: string
-          status: string
-          qualificationSummary?: string
-        }>
-        conversations: Array<{
-          _id: string
-          candidateId: string
-          status: string
-          lastMessageAt?: number
-        }>
-        jobs: Array<{
-          _id: string
-          kind: string
-          status: string
-          attemptCount: number
-          lastErrorCategory?: string
-          lastErrorSummary?: string
-          updatedAt: number
-        }>
-        events: Array<{
-          eventType: string
-          safeMessage: string
-          correlationId: string
-          createdAt: number
-        }>
-      }
-    >
-  }
-}
+import { errorMessage } from '~/lib/errors'
+import { Alert, Button, Input } from '~/components/ui'
 
 export function RequestDetail({
   requestId,
@@ -230,10 +27,12 @@ export function RequestDetail({
   const diagnostics = useQuery(productApi.diagnostics.getRequest, { requestId })
   const pause = useMutation(productApi.requests.pauseAutomation)
   const resume = useMutation(productApi.requests.resumeAutomation)
+  const retryIntake = useMutation(productApi.requests.retryIntake)
   const cancel = useMutation(productApi.requests.cancel)
   const retry = useMutation(productApi.outreach.retryFailed)
   const selectCandidates = useMutation(productApi.outreach.selectCandidates)
   const [error, setError] = useState<string | null>(null)
+  const [isRetryingIntake, setIsRetryingIntake] = useState(false)
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   if (detail === undefined)
     return (
@@ -246,13 +45,7 @@ export function RequestDetail({
   )
   const run = (operation: Promise<unknown>) => {
     setError(null)
-    void operation.catch((reason) =>
-      setError(
-        reason instanceof Error
-          ? reason.message.replace(/^\w+:\s*/, '')
-          : 'Action could not be completed.',
-      ),
-    )
+    void operation.catch((reason) => setError(errorMessage(reason)))
   }
   return (
     <section className="mt-6 space-y-6 rounded-xl border border-slate-300 p-5 dark:border-slate-700">
@@ -267,15 +60,10 @@ export function RequestDetail({
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            className="rounded border px-3 py-1 text-sm"
-            onClick={onClose}
-            type="button"
-          >
+          <Button onClick={onClose} size="sm" variant="outline">
             Back to requests
-          </button>
-          <button
-            className="rounded border px-3 py-1 text-sm"
+          </Button>
+          <Button
             onClick={() =>
               run(
                 detail.request.automationPaused
@@ -283,24 +71,46 @@ export function RequestDetail({
                   : pause({ requestId }),
               )
             }
-            type="button"
+            size="sm"
+            variant="outline"
           >
             {detail.request.automationPaused ? 'Resume' : 'Pause'}
-          </button>
-          <button
-            className="rounded border border-red-300 px-3 py-1 text-sm text-red-700"
+          </Button>
+          <Button
             onClick={() => run(cancel({ requestId }))}
-            type="button"
+            size="sm"
+            variant="destructive"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </header>
-      {error ? (
-        <p className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>
-      ) : null}
+      {error ? <Alert variant="destructive">{error}</Alert> : null}
+      <WorkflowNotice
+        diagnostics={diagnostics}
+        isRetrying={isRetryingIntake}
+        onRetry={() => {
+          setError(null)
+          setIsRetryingIntake(true)
+          void retryIntake({ requestId })
+            .catch((reason) =>
+              setError(
+                errorMessage(
+                  reason,
+                  'Request interpretation could not be retried.',
+                ),
+              ),
+            )
+            .finally(() => setIsRetryingIntake(false))
+        }}
+      />
       <ResearchSummary detail={detail} />
-      <RankedCandidates detail={detail} onError={setError} onEvidence={setEvidence} selectCandidates={selectCandidates} />
+      <RankedCandidates
+        detail={detail}
+        onError={setError}
+        onEvidence={setEvidence}
+        selectCandidates={selectCandidates}
+      />
       <EvidenceDrawer evidence={evidence} />
       <Requirements detail={detail} onError={setError} />
       <Questions questions={detail.questions} onError={setError} />
@@ -334,41 +144,159 @@ export function RequestDetail({
   )
 }
 
-function RankedCandidates({ detail, onError, onEvidence, selectCandidates }: { detail: Detail; onError: (value: string | null) => void; onEvidence: (value: EvidenceItem) => void; selectCandidates: (args: { requestId: string; candidateIds: Array<string> }) => Promise<unknown> }) {
+function RankedCandidates({
+  detail,
+  onError,
+  onEvidence,
+  selectCandidates,
+}: {
+  detail: Detail
+  onError: (value: string | null) => void
+  onEvidence: (value: EvidenceItem) => void
+  selectCandidates: (args: {
+    requestId: string
+    candidateIds: Array<string>
+  }) => Promise<unknown>
+}) {
   const [selected, setSelected] = useState<Array<string>>([])
-  const ranked = detail.candidates.filter(candidate => candidate.recommendationStatus === 'recommended' || candidate.recommendationStatus === 'selected')
+  const [isContacting, setIsContacting] = useState(false)
+  const ranked = detail.candidates.filter(
+    (candidate) =>
+      candidate.recommendationStatus === 'recommended' ||
+      candidate.recommendationStatus === 'selected',
+  )
   const ranking = detail.request.rankingStatus ?? 'pending'
-  const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(value => value !== id) : current.length < 5 ? [...current, id] : current)
-  return <section className="rounded-lg border border-sky-200 p-4 dark:border-sky-900">
-    <h3 className="font-semibold">Buyer shortlist</h3>
-    {ranking === 'pending' || ranking === 'running' ? <p className="mt-1 text-sm text-slate-500">Ranking evidence-bounded candidates… no provider will be contacted yet.</p> : null}
-    {ranking === 'retryable_failure' || ranking === 'needs_user' ? <p className="mt-1 text-sm text-amber-700">Ranking needs attention: {detail.request.rankingError ?? 'retry later after ranking is available.'}</p> : null}
-    {ranking === 'ready' && !ranked.length ? <p className="mt-1 text-sm text-slate-500">No candidate is currently recommended. Review the retained evidence or continue research.</p> : null}
-    {ranked.map(candidate => <label className="mt-3 block rounded border p-3 text-sm" key={candidate._id}><input aria-label={`Select ${candidate.name}`} checked={selected.includes(candidate._id)} disabled={candidate.recommendationStatus === 'selected'} onChange={() => toggle(candidate._id)} type="checkbox" /> <strong className="ml-2">{candidate.name}</strong>{candidate.recommendationStatus === 'selected' ? ' · selected for contact' : ''}{candidate.recommendationScore !== undefined ? ` · ${Math.round(candidate.recommendationScore)}/100` : ''}<p className="mt-1">{candidate.recommendationReason}</p><p className="mt-1 text-xs text-slate-500">Caveats: {candidate.recommendationCaveats?.join(' · ') ?? 'None recorded.'}</p>{candidate.facts[0] ? <button className="mt-2 block text-left text-xs underline" onClick={() => onEvidence({ label: candidate.facts[0].label, sourceType: candidate.facts[0].sourceType, value: candidate.facts[0].value.value, sourceUrl: candidate.facts[0].sourceUrl, excerpt: candidate.facts[0].excerpt, observedAt: candidate.facts[0].observedAt, confidence: candidate.facts[0].confidence })} type="button">View retained website evidence</button> : <p className="mt-2 text-xs text-slate-500">No retained website evidence.</p>}</label>)}
-    <p className="mt-3 text-xs text-slate-500" aria-live="polite">{selected.length} of up to 5 recommended providers selected.</p>
-    <button className="mt-2 rounded border px-3 py-1 text-sm disabled:opacity-50" disabled={!selected.length || detail.request.automationPaused || ranking !== 'ready'} onClick={() => void selectCandidates({ requestId: detail.request._id, candidateIds: selected }).then(() => setSelected([])).catch(() => onError('Could not queue the selected providers. Refresh the recommendations and inbox status.'))} type="button">Contact selected</button>
-  </section>
-}
-
-function ResearchSummary({ detail }: { detail: Detail }) {
-  const c = detail.request.candidateCounts
-  const message =
-    detail.request.researchStatus === 'empty'
-      ? 'No viable providers yet. Edit the request details or resume automation to recover.'
-      : detail.request.automationPaused
-        ? 'Automation is paused; inbound messages remain visible.'
-        : 'Research and contact progress updates here in realtime.'
+  const toggle = (id: string) =>
+    setSelected((current) =>
+      current.includes(id)
+        ? current.filter((value) => value !== id)
+        : current.length < 5
+          ? [...current, id]
+          : current,
+    )
   return (
-    <section className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-      <h3 className="font-semibold">Live research progress</h3>
-      <p className="mt-1 text-sm">
-        {c.discovered} discovered · {c.researching} researching · {c.qualified}{' '}
-        qualified · {c.rejected} rejected · {c.queuedForContact} queued ·{' '}
-        {c.contacted} contacted · {c.responded} responded
+    <section className="rounded-lg border border-sky-200 p-4 dark:border-sky-900">
+      <h3 className="font-semibold">Buyer shortlist</h3>
+      {ranking === 'pending' || ranking === 'running' ? (
+        <p className="mt-1 text-sm text-slate-500">
+          Ranking evidence-bounded candidates… no provider will be contacted
+          yet.
+        </p>
+      ) : null}
+      {ranking === 'retryable_failure' || ranking === 'needs_user' ? (
+        <p className="mt-1 text-sm text-amber-700">
+          Ranking needs attention:{' '}
+          {detail.request.rankingError ??
+            'retry later after ranking is available.'}
+        </p>
+      ) : null}
+      {ranking === 'ready' && !ranked.length ? (
+        <p className="mt-1 text-sm text-slate-500">
+          No candidate is currently recommended. Review the retained evidence or
+          continue research.
+        </p>
+      ) : null}
+      {ranked.map((candidate) => {
+        const hasEmail = candidate.endpoints.some(
+          (endpoint) =>
+            endpoint.type === 'email' &&
+            (endpoint.verificationState === 'public' ||
+              endpoint.verificationState === 'verified'),
+        )
+        return (
+          <label
+            className="mt-3 block rounded border p-3 text-sm"
+            key={candidate._id}
+          >
+            <input
+              aria-label={`Select ${candidate.name}`}
+              checked={selected.includes(candidate._id)}
+              disabled={
+                candidate.recommendationStatus === 'selected' ||
+                !hasEmail ||
+                isContacting
+              }
+              onChange={() => toggle(candidate._id)}
+              type="checkbox"
+            />{' '}
+            <strong className="ml-2">{candidate.name}</strong>
+            {candidate.recommendationStatus === 'selected'
+              ? ' · selected for contact'
+              : ''}
+            {candidate.recommendationScore !== undefined
+              ? ` · ${Math.round(candidate.recommendationScore)}/100`
+              : ''}
+            <p className="mt-1">{candidate.recommendationReason}</p>
+            {!hasEmail ? (
+              <p className="mt-1 text-xs text-amber-700">
+                A verified public email is required before this provider can be
+                contacted.
+              </p>
+            ) : null}
+            <p className="mt-1 text-xs text-slate-500">
+              Caveats:{' '}
+              {candidate.recommendationCaveats?.join(' · ') ?? 'None recorded.'}
+            </p>
+            {candidate.facts[0] ? (
+              <Button
+                className="mt-2 h-auto justify-start p-0 text-left text-xs"
+                onClick={() =>
+                  onEvidence({
+                    label: candidate.facts[0].label,
+                    sourceType: candidate.facts[0].sourceType,
+                    value: candidate.facts[0].value.value,
+                    sourceUrl: candidate.facts[0].sourceUrl,
+                    excerpt: candidate.facts[0].excerpt,
+                    observedAt: candidate.facts[0].observedAt,
+                    confidence: candidate.facts[0].confidence,
+                  })
+                }
+                variant="link"
+              >
+                View retained website evidence
+              </Button>
+            ) : (
+              <p className="mt-2 text-xs text-slate-500">
+                No retained website evidence.
+              </p>
+            )}
+          </label>
+        )
+      })}
+      <p className="mt-3 text-xs text-slate-500" aria-live="polite">
+        {selected.length} of up to 5 recommended providers selected.
       </p>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        {message}
-      </p>
+      <Button
+        className="mt-2"
+        disabled={
+          !selected.length ||
+          detail.request.automationPaused ||
+          ranking !== 'ready' ||
+          isContacting
+        }
+        onClick={() => {
+          onError(null)
+          setIsContacting(true)
+          void selectCandidates({
+            requestId: detail.request._id,
+            candidateIds: selected,
+          })
+            .then(() => setSelected([]))
+            .catch((reason) =>
+              onError(
+                errorMessage(
+                  reason,
+                  'Could not queue the selected providers. Refresh the recommendations and inbox status.',
+                ),
+              ),
+            )
+            .finally(() => setIsContacting(false))
+        }}
+        size="sm"
+        variant="outline"
+      >
+        {isContacting ? 'Queuing contact…' : 'Contact selected'}
+      </Button>
     </section>
   )
 }
@@ -443,17 +371,17 @@ function Requirements({
                       {item.source} · {Math.round(item.confidence * 100)}%
                     </em>
                   </span>
-                  <button
-                    className="text-xs underline"
+                  <Button
+                    className="h-auto p-0 text-xs"
                     onClick={() =>
                       void remove({ requirementId: item._id }).catch(() =>
                         onError('Requirement could not be removed.'),
                       )
                     }
-                    type="button"
+                    variant="link"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -468,17 +396,15 @@ function Requirements({
         className="grid gap-2 rounded border p-3 md:grid-cols-4"
         onSubmit={save}
       >
-        <input
+        <Input
           aria-label="Requirement key"
-          className="rounded border bg-transparent p-2 text-sm"
           onChange={(event) => setDraft({ ...draft, key: event.target.value })}
           placeholder="key"
           required
           value={draft.key}
         />
-        <input
+        <Input
           aria-label="Requirement label"
-          className="rounded border bg-transparent p-2 text-sm"
           onChange={(event) =>
             setDraft({ ...draft, label: event.target.value })
           }
@@ -486,9 +412,8 @@ function Requirements({
           required
           value={draft.label}
         />
-        <input
+        <Input
           aria-label="Requirement value"
-          className="rounded border bg-transparent p-2 text-sm"
           onChange={(event) =>
             setDraft({ ...draft, value: event.target.value })
           }
@@ -511,9 +436,9 @@ function Requirements({
             <option value="preference">Preference</option>
             <option value="information">Info</option>
           </select>
-          <button className="rounded border px-3 text-sm" type="submit">
+          <Button size="sm" type="submit" variant="outline">
             Add
-          </button>
+          </Button>
         </div>
       </form>
     </section>
@@ -551,8 +476,8 @@ function Questions({
                 <strong>{question.importance}</strong> — {question.text}
               </p>
               <div className="mt-2 flex gap-2">
-                <input
-                  className="min-w-0 flex-1 rounded border bg-transparent p-2 text-sm"
+                <Input
+                  className="min-w-0 flex-1"
                   onChange={(event) =>
                     setAnswers({
                       ...answers,
@@ -563,9 +488,9 @@ function Questions({
                   required
                   value={answers[question._id] ?? ''}
                 />
-                <button className="rounded border px-3 text-sm" type="submit">
+                <Button size="sm" type="submit" variant="outline">
                   Answer
-                </button>
+                </Button>
               </div>
             </form>
           ))}
@@ -858,29 +783,8 @@ function Proposals({
   )
 }
 
-function Diagnostics({
-  value,
-}: {
-  value: ReturnType<typeof useQuery> | undefined
-}) {
-  const data = value as
-    | {
-        jobs?: Array<{
-          _id: string
-          kind: string
-          status: string
-          attemptCount: number
-          lastErrorCategory?: string
-          lastErrorSummary?: string
-        }>
-        events?: Array<{
-          eventType: string
-          safeMessage: string
-          correlationId: string
-          createdAt: number
-        }>
-      }
-    | undefined
+function Diagnostics({ value }: { value: RequestDiagnostics | undefined }) {
+  const data = value
   return (
     <details className="rounded border p-3 text-sm">
       <summary className="cursor-pointer font-semibold">
@@ -891,7 +795,7 @@ function Diagnostics({
           <div>
             <h4 className="text-xs font-semibold">Jobs</h4>
             <ul>
-              {data.jobs?.map((job) => (
+              {data.jobs.map((job) => (
                 <li className="mt-1 text-xs" key={job._id}>
                   {job.kind}: {job.status} ({job.attemptCount})
                   {job.lastErrorSummary ? ` — ${job.lastErrorSummary}` : ''}
@@ -902,7 +806,7 @@ function Diagnostics({
           <div>
             <h4 className="text-xs font-semibold">Activity</h4>
             <ul>
-              {data.events?.map((event) => (
+              {data.events.map((event) => (
                 <li
                   className="mt-1 text-xs"
                   key={`${event.correlationId}-${event.createdAt}`}

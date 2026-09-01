@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { displayEvidenceValue, safeEvidenceUrl } from './evidencePolicy'
+import { Alert, Button } from '~/components/ui'
 
 export type EvidenceItem = {
   label: string
@@ -20,7 +21,7 @@ export function EvidenceDrawer({
   if (!evidence) return null
   const url = safeEvidenceUrl(evidence.sourceUrl)
   return (
-    <aside className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-slate-900 dark:border-sky-900 dark:bg-slate-950 dark:text-slate-100">
+    <Alert className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h4 className="font-semibold">Evidence: {evidence.label}</h4>
@@ -31,13 +32,13 @@ export function EvidenceDrawer({
               : ''}
           </p>
         </div>
-        <button
-          className="rounded border border-sky-300 px-2 py-1 text-xs"
+        <Button
           onClick={() => setOpen((value) => !value)}
-          type="button"
+          size="sm"
+          variant="outline"
         >
           {open ? 'Close' : 'Inspect'}
-        </button>
+        </Button>
       </div>
       {open ? (
         <div className="mt-3 space-y-2">
@@ -70,6 +71,6 @@ export function EvidenceDrawer({
           ) : null}
         </div>
       ) : null}
-    </aside>
+    </Alert>
   )
 }
