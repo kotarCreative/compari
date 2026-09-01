@@ -17,10 +17,19 @@ export const list = query({
   ),
   handler: async (ctx, args) => {
     await requireOwnedRequest(ctx, args.requestId)
-    return await ctx.db
+    const proposals = await ctx.db
       .query('proposals')
       .withIndex('by_request_id', (q) => q.eq('requestId', args.requestId))
       .order('desc')
       .take(20)
+    return proposals.map((proposal) => ({
+      _id: proposal._id,
+      candidateId: proposal.candidateId,
+      status: proposal.status,
+      summary: proposal.summary,
+      confidence: proposal.confidence,
+      version: proposal.version,
+      attributes: proposal.attributes,
+    }))
   },
 })
