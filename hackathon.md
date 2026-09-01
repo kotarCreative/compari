@@ -10,9 +10,9 @@
 - **Components:** none
 - **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, realtime queries
 - **Auth:** Convex Auth
-- **AI models:** none
+- **AI models:** gpt-4.1-mini
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-08-29T21:28:50Z
+- **Last updated:** 2026-08-31T23:59:16Z
 
 ## Log
 
@@ -44,8 +44,12 @@ Defined an executable MVP roadmap covering passkey authentication, automatic per
 
 Refined the planned agent workflow so creating a request authorizes bounded autonomous provider research, outreach, and factual follow-ups. The only mandatory confirmation gate is the user's final provider choice; automated booking, payment, signing, acceptance, and scope expansion remain prohibited (`.specs/Roadmap.md`, `.specs/06-autonomous-outreach-and-contact.md`, `.specs/09-evaluation-and-dynamic-ui.md`).
 
-### 2026-08-29 - working tree
+### 2026-08-30 - 1230c93
 
-Replaced the starter demo with an authenticated procurement workspace: user bootstrap and inbox jobs, owned requests and requirements, candidate research/outreach, conversations, evidence-backed proposals, trusted comparison views, diagnostics, and an explicit final-choice mutation (`convex/`, `src/features/`). Added leased side-effect jobs, bounded indexed reads, state policies, and server-gated deterministic demo adapters; local typecheck, lint, build, and 12 deterministic tests pass.
+Replaced the starter demo with an authenticated procurement workspace: user bootstrap and inbox jobs, owned requests and requirements, candidate research/outreach, conversations, evidence-backed proposals, trusted comparison views, diagnostics, and an explicit final-choice mutation (`convex/`, `src/features/`). Added leased side-effect jobs, bounded indexed reads, state policies, and server-gated deterministic demo adapters; local typecheck, lint, build, and 14 deterministic tests pass.
+
+### 2026-08-31 - 47d186c
+
+Completed production-shaped provider boundaries for AgentMail, Firecrawl, and OpenAI reasoning/ranking, including pod-scoped inbox provisioning, verified inbound webhook routing, durable extraction/ranking/outreach jobs, and evidence-backed proposal updates (`convex/adapters/`, `convex/webhookProcessor.ts`, `convex/reasoningWorkflow.ts`, `convex/rankingState.ts`). Refactored the frontend into feature contracts and centralized shadcn-style UI primitives; the route now focuses on authentication/bootstrap while workspace and request behavior live in deep feature modules (`src/components/`, `src/features/`, `src/routes/index.tsx`). Local tests, typecheck, lint, and production build pass; live-provider and deployment-backed verification remain pending.
 
 The app is not deployed. Real passkeys, verified inbound webhooks, and production AgentMail, Firecrawl, and AI calls remain deliberately fail-closed until their providers, credentials, and deployment-backed verification are available.
