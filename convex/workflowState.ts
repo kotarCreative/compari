@@ -352,7 +352,7 @@ export const recordDiscovery = internalMutation({
       let business = await ctx.db
         .query('businesses')
         .withIndex('by_domain', (q) => q.eq('normalizedDomain', domain))
-        .unique()
+        .first()
       if (!business) {
         const id = await ctx.db.insert('businesses', {
           canonicalName: result.name,
@@ -556,7 +556,7 @@ export const recordCandidateResearch = internalMutation({
         .withIndex('by_business_id_and_value', (q) =>
           q.eq('businessId', business._id).eq('value', extracted.value),
         )
-        .unique()
+        .first()
       if (!endpoint)
         await ctx.db.insert('contactEndpoints', {
           businessId: business._id,

@@ -22,6 +22,7 @@ import type * as demoActions from "../demoActions.js";
 import type * as demoJobs from "../demoJobs.js";
 import type * as diagnostics from "../diagnostics.js";
 import type * as domain_decision from "../domain/decision.js";
+import type * as domain_demo from "../domain/demo.js";
 import type * as domain_followUpPolicy from "../domain/followUpPolicy.js";
 import type * as domain_inboxProvisioning from "../domain/inboxProvisioning.js";
 import type * as domain_outboundPolicy from "../domain/outboundPolicy.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   demoJobs: typeof demoJobs;
   diagnostics: typeof diagnostics;
   "domain/decision": typeof domain_decision;
+  "domain/demo": typeof domain_demo;
   "domain/followUpPolicy": typeof domain_followUpPolicy;
   "domain/inboxProvisioning": typeof domain_inboxProvisioning;
   "domain/outboundPolicy": typeof domain_outboundPolicy;

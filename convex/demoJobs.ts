@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalMutation } from './_generated/server'
+import { demoProviderMessageIds } from './domain/demo'
 
 export const seed = internalMutation({
   args: { userId: v.id('users') },
@@ -71,13 +72,21 @@ export const seed = internalMutation({
       },
     ]
     for (const [index, provider] of providers.entries()) {
-      const businessId = await ctx.db.insert('businesses', {
-        canonicalName: provider.name,
-        normalizedDomain: provider.domain,
-        website: `https://${provider.domain}`,
-        createdAt: now,
-        updatedAt: now,
-      })
+      const existingBusiness = await ctx.db
+        .query('businesses')
+        .withIndex('by_domain', (q) =>
+          q.eq('normalizedDomain', provider.domain),
+        )
+        .first()
+      const businessId =
+        existingBusiness?._id ??
+        (await ctx.db.insert('businesses', {
+          canonicalName: provider.name,
+          normalizedDomain: provider.domain,
+          website: `https://${provider.domain}`,
+          createdAt: now,
+          updatedAt: now,
+        }))
       const candidateId = await ctx.db.insert('requestCandidates', {
         requestId,
         businessId,
@@ -89,23 +98,32 @@ export const seed = internalMutation({
         createdAt: now,
         updatedAt: now,
       })
-      const endpointId = await ctx.db.insert('contactEndpoints', {
-        businessId,
-        type: provider.method,
-        value:
-          provider.method === 'email'
-            ? `sales@${provider.domain}`
-            : `https://${provider.domain}/quote`,
-        verificationState: 'verified',
-        metadata: { schemaVersion: 1, value: { demoFixture: true } },
-        discoveryEvidence: {
-          url: `https://${provider.domain}`,
-          observedAt: now,
-          confidence: 1,
-        },
-        createdAt: now,
-        updatedAt: now,
-      })
+      const endpointValue =
+        provider.method === 'email'
+          ? `sales@${provider.domain}`
+          : `https://${provider.domain}/quote`
+      const existingEndpoint = await ctx.db
+        .query('contactEndpoints')
+        .withIndex('by_business_id_and_value', (q) =>
+          q.eq('businessId', businessId).eq('value', endpointValue),
+        )
+        .first()
+      const endpointId =
+        existingEndpoint?._id ??
+        (await ctx.db.insert('contactEndpoints', {
+          businessId,
+          type: provider.method,
+          value: endpointValue,
+          verificationState: 'verified',
+          metadata: { schemaVersion: 1, value: { demoFixture: true } },
+          discoveryEvidence: {
+            url: `https://${provider.domain}`,
+            observedAt: now,
+            confidence: 1,
+          },
+          createdAt: now,
+          updatedAt: now,
+        }))
       const jobId = await ctx.db.insert('sideEffectJobs', {
         userId: user._id,
         kind:
@@ -156,13 +174,14 @@ export const seed = internalMutation({
           updatedAt: now + 1,
         })
       }
+      const messageIds = demoProviderMessageIds(requestId, index)
       const messageId = await ctx.runMutation(
         internal.conversations.ingestProviderMessage,
         {
-          externalEventId: `demo-reply-${index}-v1`,
+          externalEventId: messageIds.externalEventId,
           inboxId,
-          threadId: `demo-thread-${index}`,
-          messageId: `demo-message-${index}`,
+          threadId: messageIds.threadId,
+          messageId: messageIds.messageId,
           sender: `sales@${provider.domain}`,
           subject: 'Brochure quote',
           body: `We can print 500 full-color matte brochures for ${provider.price}. ${provider.availability}`,
