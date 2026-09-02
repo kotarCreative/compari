@@ -149,3 +149,38 @@ test('official AgentMail adapter maps inbox and idempotent message contracts', a
   ])
   assert.deepEqual(calls[4], ['get', 'inbox_1', 'msg_3'])
 })
+
+test('official AgentMail adapter retries a taken username deterministically', async () => {
+  const calls = []
+  const taken = Object.assign(new Error('Inbox is taken'), {
+    statusCode: 403,
+    body: { code: 'resource_taken' },
+  })
+  const client = {
+    pods: {
+      list: async () => ({ pods: [{ podId: 'pod_demo', name: 'demo' }] }),
+      inboxes: {
+        create: async (...args) => {
+          calls.push(args)
+          if (calls.length === 1) throw taken
+          return { inboxId: 'inbox_2', email: 'buyer123@agentmail.to' }
+        },
+      },
+    },
+  }
+  const adapter = new AgentMailSdkAdapter(() => client)
+
+  assert.deepEqual(
+    await adapter.provisionInbox({
+      username: 'buyer',
+      displayName: 'Buyer',
+      clientId: 'compari-user-u1-inbox-v1',
+    }),
+    { inboxId: 'inbox_2', emailAddress: 'buyer123@agentmail.to' },
+  )
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0][1].username, 'buyer')
+  assert.notEqual(calls[1][1].username, 'buyer')
+  assert.equal(calls[1][1].clientId, calls[0][1].clientId)
+  assert.ok(calls[1][1].username.length <= 24)
+})

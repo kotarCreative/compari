@@ -57,3 +57,14 @@ test('external failures expose safe, actionable categories', () => {
     summary: 'AgentMail rejected the inbox details for pod "demo".',
   })
 })
+
+test('a taken AgentMail username is not mislabeled as bad credentials', () => {
+  const error = Object.assign(new Error('Status code: 403'), {
+    statusCode: 403,
+    body: { code: 'resource_taken' },
+  })
+  assert.deepEqual(safeExternalError(error), {
+    category: 'permanent_external',
+    summary: 'The requested AgentMail inbox address is unavailable.',
+  })
+})

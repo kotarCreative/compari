@@ -109,11 +109,22 @@ export class AgentMailSdkAdapter implements AgentMailPort {
 
   async provisionInbox(input: ProvisionInboxInput): Promise<ProvisionedInbox> {
     const client = this.client()
-    const inbox = await client.pods.inboxes.create(await this.podId(), {
-      username: input.username,
-      displayName: input.displayName,
-      clientId: input.clientId,
-    })
+    const podId = await this.podId()
+    let inbox
+    try {
+      inbox = await client.pods.inboxes.create(podId, {
+        username: input.username,
+        displayName: input.displayName,
+        clientId: input.clientId,
+      })
+    } catch (error) {
+      if (!isResourceTakenError(error)) throw error
+      inbox = await client.pods.inboxes.create(podId, {
+        username: collisionSafeUsername(input.username, input.clientId),
+        displayName: input.displayName,
+        clientId: input.clientId,
+      })
+    }
     return { inboxId: inbox.inboxId, emailAddress: inbox.email }
   }
 
@@ -185,4 +196,19 @@ function stableId(value: string) {
   for (const char of value)
     hash = Math.imul(hash ^ char.charCodeAt(0), 16777619)
   return (hash >>> 0).toString(36)
+}
+
+function collisionSafeUsername(username: string, clientId: string): string {
+  const suffix = stableId(clientId).slice(0, 7)
+  return `${username.slice(0, 24 - suffix.length)}${suffix}`
+}
+
+function isResourceTakenError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const body = (error as { body?: unknown }).body
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'resource_taken'
+  )
 }

@@ -57,6 +57,14 @@ export function safeExternalError(error: unknown): {
     error instanceof Error
       ? error.message.toLowerCase()
       : 'unknown external failure'
+  const body =
+    typeof error === 'object' && error !== null
+      ? (error as { body?: unknown }).body
+      : undefined
+  const errorCode =
+    typeof body === 'object' && body !== null
+      ? (body as { code?: unknown }).code
+      : undefined
   if (message.includes('agentmail pod "demo" was not found'))
     return {
       category: 'permanent_external',
@@ -66,6 +74,11 @@ export function safeExternalError(error: unknown): {
     return {
       category: 'permanent_external',
       summary: 'More than one AgentMail pod is named "demo".',
+    }
+  if (errorCode === 'resource_taken')
+    return {
+      category: 'permanent_external',
+      summary: 'The requested AgentMail inbox address is unavailable.',
     }
   if (
     statusCode === 408 ||
