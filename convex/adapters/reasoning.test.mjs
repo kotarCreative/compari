@@ -4,7 +4,6 @@ import {
   createDeterministicReasoningPort,
   normalizeIntake,
   normalizeProviderResponse,
-  openAIOutputText,
 } from './reasoning.ts'
 import { normalizeExtractionDto } from '../domain/reasoning.ts'
 
@@ -53,7 +52,7 @@ test('production reasoning remains fail-closed without an OpenAI key', async () 
   if (previousKey !== undefined) process.env.OPENAI_API_KEY = previousKey
 })
 
-test('OpenAI response helpers normalize bounded intake output', () => {
+test('structured output normalization preserves bounded intake data', () => {
   const wire = {
     schemaVersion: 1,
     title: 'Tree removal',
@@ -72,12 +71,6 @@ test('OpenAI response helpers normalize bounded intake output', () => {
       { question: 'Is stump grinding required?', importance: 'useful' },
     ],
   }
-  const payload = {
-    output: [
-      { content: [{ type: 'output_text', text: JSON.stringify(wire) }] },
-    ],
-  }
-  assert.equal(openAIOutputText(payload), JSON.stringify(wire))
   const intake = normalizeIntake(wire)
   assert.equal(intake?.requirements[0]?.key, 'scope')
   assert.equal(intake?.clarifyingQuestions[0]?.importance, 'useful')

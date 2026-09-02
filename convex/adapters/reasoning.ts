@@ -1,11 +1,7 @@
 'use node'
 import { normalizeExtractionDto } from '../domain/reasoning.ts'
-import {
-  deploymentEnv,
-  isDemoMode,
-  isRetryableHttpStatus,
-  requireDeploymentEnv,
-} from './runtime.ts'
+import { generateOpenAIStructuredOutput } from './openai.ts'
+import { isDemoMode } from './runtime.ts'
 import type { ExtractedRequirement, ReasoningPort } from '../ports/reasoning'
 
 type IntakeResult = Awaited<ReturnType<ReasoningPort['extractRequirements']>>
@@ -21,7 +17,8 @@ class OpenAIReasoningAdapter implements ReasoningPort {
     timezone: string
     corrections: Array<ExtractedRequirement>
   }) {
-    const value = await requestStructuredOutput({
+    const value = await generateOpenAIStructuredOutput({
+      operation: 'reasoning',
       name: 'procurement_requirements',
       schema: intakeSchema,
       system:
@@ -35,7 +32,8 @@ class OpenAIReasoningAdapter implements ReasoningPort {
   }
 
   async extractProviderResponse(input: { delimitedBody: string }) {
-    const value = await requestStructuredOutput({
+    const value = await generateOpenAIStructuredOutput({
+      operation: 'reasoning',
       name: 'provider_response_extraction',
       schema: providerResponseSchema,
       system:
@@ -158,76 +156,6 @@ const providerResponseSchema = {
     providerQuestion: { type: ['string', 'null'], maxLength: 500 },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
-}
-
-async function requestStructuredOutput(input: {
-  name: string
-  schema: Record<string, unknown>
-  system: string
-  user: string
-}): Promise<unknown> {
-  const apiKey = requireDeploymentEnv(
-    'OPENAI_API_KEY',
-    'needs_user: OpenAI reasoning is not configured',
-  )
-  let response: Response
-  try {
-    response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: deploymentEnv('OPENAI_REASONING_MODEL') ?? 'gpt-4.1-mini',
-        store: false,
-        input: [
-          { role: 'system', content: input.system },
-          { role: 'user', content: input.user },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: input.name,
-            strict: true,
-            schema: input.schema,
-          },
-        },
-      }),
-    })
-  } catch {
-    throw new Error('retryable_external: OpenAI could not be reached')
-  }
-  const payload: unknown = await response.json().catch(() => null)
-  if (!response.ok) {
-    const retryable = isRetryableHttpStatus(response.status)
-    throw new Error(
-      retryable
-        ? 'retryable_external: OpenAI is temporarily unavailable'
-        : 'needs_user: OpenAI configuration or request needs attention',
-    )
-  }
-  const text = openAIOutputText(payload)
-  if (!text) throw new Error('needs_user: OpenAI returned no structured output')
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new Error('needs_user: OpenAI returned invalid structured output')
-  }
-}
-
-export function openAIOutputText(value: unknown): string | null {
-  if (!isRecord(value)) return null
-  if (typeof value.output_text === 'string') return value.output_text
-  if (!Array.isArray(value.output)) return null
-  for (const item of value.output) {
-    if (!isRecord(item) || !Array.isArray(item.content)) continue
-    for (const content of item.content) {
-      if (isRecord(content) && typeof content.text === 'string')
-        return content.text
-    }
-  }
-  return null
 }
 
 export function normalizeIntake(value: unknown): IntakeResult | null {

@@ -10,6 +10,7 @@
 
 import type * as adapters_agentMail from "../adapters/agentMail.js";
 import type * as adapters_firecrawl from "../adapters/firecrawl.js";
+import type * as adapters_openai from "../adapters/openai.js";
 import type * as adapters_ranking from "../adapters/ranking.js";
 import type * as adapters_reasoning from "../adapters/reasoning.js";
 import type * as adapters_runtime from "../adapters/runtime.js";
@@ -72,6 +73,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "adapters/agentMail": typeof adapters_agentMail;
   "adapters/firecrawl": typeof adapters_firecrawl;
+  "adapters/openai": typeof adapters_openai;
   "adapters/ranking": typeof adapters_ranking;
   "adapters/reasoning": typeof adapters_reasoning;
   "adapters/runtime": typeof adapters_runtime;
