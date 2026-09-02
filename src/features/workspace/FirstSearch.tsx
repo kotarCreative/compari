@@ -10,7 +10,7 @@ import {
 } from './constants'
 import { OnboardingTransition } from './OnboardingTransition'
 import type { FormEvent } from 'react'
-import { Button, Input, Label, Textarea } from '~/components/ui'
+import { Input, Label, Textarea } from '~/components/ui'
 
 export function FirstSearch() {
   const { signIn } = useAuthActions()
@@ -109,41 +109,35 @@ export function FirstSearch() {
             </h1>
           </div>
           <form
-            className="animate-onboarding-request space-y-3"
+            className="animate-onboarding-request space-y-4"
             onSubmit={(event) => void submitRequest(event)}
           >
-            <Label htmlFor="first-request-prompt">
-              What would you like to compare?
-            </Label>
-            <Textarea
-              autoFocus
-              className="min-h-32"
-              id="first-request-prompt"
-              minLength={12}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder={requestPromptPlaceholder}
-              required
-              value={prompt}
-            />
-            <div className="flex flex-wrap gap-3">
-              <Button
-                disabled={prompt.trim().length < 12}
-                size="lg"
-                type="submit"
-              >
-                Start comparison
-              </Button>
-              <Button
-                onClick={() => {
-                  setError(null)
-                  setStep('name')
+            <div className="space-y-3">
+              <Label className="block" htmlFor="first-request-prompt">
+                What do you need to do?
+              </Label>
+              <Textarea
+                autoFocus
+                className="min-h-32"
+                id="first-request-prompt"
+                minLength={12}
+                onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.metaKey) {
+                    event.preventDefault()
+                    event.currentTarget.form?.requestSubmit()
+                  }
                 }}
-                type="button"
-                variant="outline"
-              >
-                Change name
-              </Button>
+                placeholder={requestPromptPlaceholder}
+                required
+                value={prompt}
+              />
             </div>
+            <p className="text-xs text-slate-500">
+              Press <kbd className="font-sans">⌘</kbd> +{' '}
+              <kbd className="font-sans">Enter</kbd> to start searching for
+              vendors.
+            </p>
             {error ? (
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             ) : null}
