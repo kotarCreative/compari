@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-08-31T23:59:16Z
+- **Last updated:** 2026-09-02T03:22:59Z
 
 ## Log
 
@@ -52,4 +52,14 @@ Replaced the starter demo with an authenticated procurement workspace: user boot
 
 Completed production-shaped provider boundaries for AgentMail, Firecrawl, and OpenAI reasoning/ranking, including pod-scoped inbox provisioning, verified inbound webhook routing, durable extraction/ranking/outreach jobs, and evidence-backed proposal updates (`convex/adapters/`, `convex/webhookProcessor.ts`, `convex/reasoningWorkflow.ts`, `convex/rankingState.ts`). Refactored the frontend into feature contracts and centralized shadcn-style UI primitives; the route now focuses on authentication/bootstrap while workspace and request behavior live in deep feature modules (`src/components/`, `src/features/`, `src/routes/index.tsx`). Local tests, typecheck, lint, and production build pass; live-provider and deployment-backed verification remain pending.
 
-The app is not deployed. Real passkeys, verified inbound webhooks, and production AgentMail, Firecrawl, and AI calls remain deliberately fail-closed until their providers, credentials, and deployment-backed verification are available.
+### 2026-09-02 - 969cabb
+
+Made MVP runs repeatable with resettable demo jobs and stable synthetic message
+IDs (`convex/demoJobs.ts`, `convex/domain/demo.ts`). Moved OpenAI reasoning and
+ranking to the AI SDK with strict output and explicit failure mapping
+(`convex/adapters/openai.ts`). Added collision-safe numbered AgentMail inboxes
+and name-first onboarding with signed outreach and a five-second progress flow
+(`convex/users.ts`, `src/features/workspace/`). All 43 tests and checks pass.
+
+The app is not publicly deployed. Deployment-backed verification of AgentMail,
+Firecrawl, inbound webhooks, and OpenAI remains pending.
