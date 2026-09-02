@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { CenteredMessage } from '~/components/common/CenteredMessage'
 import { FirstSearch } from '~/features/workspace/FirstSearch'
 import { NameOnboarding } from '~/features/workspace/NameOnboarding'
+import { OnboardingTransition } from '~/features/workspace/OnboardingTransition'
 import { WorkspaceShell } from '~/features/workspace/WorkspaceShell'
 import { usersApi } from '~/features/workspace/contracts'
 
@@ -12,12 +13,7 @@ export const Route = createFileRoute('/')({ component: Home })
 function Home() {
   const { isLoading, isAuthenticated } = useConvexAuth()
   if (isLoading)
-    return (
-      <CenteredMessage
-        detail="Compari keeps your workspace private while it restores your session."
-        title="Checking your secure session…"
-      />
-    )
+    return <OnboardingTransition title="Restoring your secure session" />
   if (!isAuthenticated) return <FirstSearch />
   return <Bootstrap />
 }

@@ -1,6 +1,7 @@
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useState } from 'react'
 import {
+  onboardingStartedAtKey,
   pendingFirstNameKey,
   pendingFirstRequestKey,
   pendingLastNameKey,
@@ -40,6 +41,7 @@ export function FirstSearch() {
     }
     setIsStarting(true)
     try {
+      window.sessionStorage.setItem(onboardingStartedAtKey, String(Date.now()))
       window.sessionStorage.setItem(pendingFirstRequestKey, prompt.trim())
       window.sessionStorage.setItem(pendingFirstNameKey, name.firstName)
       window.sessionStorage.setItem(pendingLastNameKey, name.lastName)
@@ -48,8 +50,8 @@ export function FirstSearch() {
         throw new Error('Anonymous sign-in did not establish a session.')
     } catch {
       setError('We could not create your private workspace. Please try again.')
-    } finally {
       setIsStarting(false)
+      window.sessionStorage.removeItem(onboardingStartedAtKey)
     }
   }
 

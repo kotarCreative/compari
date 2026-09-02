@@ -1,3 +1,12 @@
+import { useEffect, useState } from 'react'
+
+const progressMessages = [
+  'Saving your details securely.',
+  'Creating your private buyer workspace.',
+  'Preparing your first comparison.',
+  'Getting everything ready for review.',
+]
+
 export function OnboardingTransition({
   firstName,
   title = 'Preparing your comparison…',
@@ -5,6 +14,17 @@ export function OnboardingTransition({
   firstName?: string
   title?: string
 }) {
+  const [messageIndex, setMessageIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = window.setInterval(
+      () =>
+        setMessageIndex((current) => (current + 1) % progressMessages.length),
+      1_250,
+    )
+    return () => window.clearInterval(interval)
+  }, [])
+
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-8 text-center">
       <div
@@ -21,8 +41,8 @@ export function OnboardingTransition({
         <h1 className="mt-4 text-3xl font-bold tracking-tight">
           {firstName ? `${title}, ${firstName}` : title}
         </h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Saving your details and preparing your private buyer workspace.
+        <p className="mt-3 min-h-6 text-slate-600 dark:text-slate-300">
+          {progressMessages[messageIndex]}
         </p>
         <div className="mt-6 flex justify-center gap-2" aria-hidden="true">
           <span className="animate-onboarding-dot h-2 w-2 rounded-full bg-sky-600" />

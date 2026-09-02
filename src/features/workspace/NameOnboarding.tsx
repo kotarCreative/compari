@@ -2,6 +2,8 @@ import { useMutation } from 'convex/react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import {
+  minimumOnboardingDurationMs,
+  onboardingStartedAtKey,
   pendingFirstNameKey,
   pendingLastNameKey,
   splitFullName,
@@ -23,12 +25,8 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
     const firstName = sessionStorage.getItem(pendingFirstNameKey)
     const lastName = sessionStorage.getItem(pendingLastNameKey)
 
-    if (didAutoComplete.current) {
-      return
-    }
-
-    didAutoComplete.current = true
     if (!firstName || !lastName) {
+      didAutoComplete.current = true
       setPhase('ready')
       return
     }
@@ -36,19 +34,32 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
     setFullName(`${firstName} ${lastName}`)
     setPhase('saving')
 
-    void completeProfile({ firstName, lastName })
-      .then(() => {
-        sessionStorage.removeItem(pendingFirstNameKey)
-        sessionStorage.removeItem(pendingLastNameKey)
-      })
-      .catch((reason: unknown) => {
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : 'We could not save your name. Please try again.',
-        )
-        setPhase('ready')
-      })
+    const storedStartedAt = sessionStorage.getItem(onboardingStartedAtKey)
+    const startedAt =
+      storedStartedAt === null ? Number.NaN : Number(storedStartedAt)
+    const elapsed = Number.isFinite(startedAt) ? Date.now() - startedAt : 0
+    const remaining = Math.max(0, minimumOnboardingDurationMs - elapsed)
+    const timeout = window.setTimeout(() => {
+      if (didAutoComplete.current) return
+      didAutoComplete.current = true
+      void completeProfile({ firstName, lastName })
+        .then(() => {
+          sessionStorage.removeItem(pendingFirstNameKey)
+          sessionStorage.removeItem(pendingLastNameKey)
+          sessionStorage.removeItem(onboardingStartedAtKey)
+        })
+        .catch((reason: unknown) => {
+          sessionStorage.removeItem(onboardingStartedAtKey)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : 'We could not save your name. Please try again.',
+          )
+          setPhase('ready')
+        })
+    }, remaining)
+
+    return () => window.clearTimeout(timeout)
   }, [completeProfile])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -67,6 +78,7 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
       await completeProfile(name)
       sessionStorage.removeItem(pendingFirstNameKey)
       sessionStorage.removeItem(pendingLastNameKey)
+      sessionStorage.removeItem(onboardingStartedAtKey)
     } catch (reason) {
       setError(
         reason instanceof Error
