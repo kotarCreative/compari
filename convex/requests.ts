@@ -92,6 +92,8 @@ export const create = mutation({
   returns: v.id('procurementRequests'),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
+    if (user.nameConfirmedAt === undefined)
+      throw new Error('validation: confirm your name before comparing')
     const prompt = args.prompt.trim()
     if (prompt.length < 12 || prompt.length > 8_000)
       throw new Error(

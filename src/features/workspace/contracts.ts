@@ -13,6 +13,7 @@ export type Profile = {
     | 'permanent_failure'
   inboxProvisioningError?: string
   inboxProvisioningAttempts?: number
+  hasConfirmedName: boolean
 }
 
 type NoArgs = Record<string, never>
@@ -34,6 +35,12 @@ export type RequestList = {
 export const usersApi = api as unknown as {
   users: {
     ensureCurrentUser: FunctionReference<'mutation', 'public', NoArgs, string>
+    completeMyProfile: FunctionReference<
+      'mutation',
+      'public',
+      { firstName: string; lastName: string },
+      null
+    >
     current: FunctionReference<'query', 'public', NoArgs, Profile | null>
     retryMyInboxProvisioning: FunctionReference<
       'mutation',

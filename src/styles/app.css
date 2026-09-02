@@ -10,3 +10,83 @@
     outline: none !important;
   }
 }
+
+@keyframes onboarding-welcome-up {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboarding-request-up {
+  from {
+    opacity: 0;
+    transform: translateY(5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboarding-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes onboarding-pulse {
+  50% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes onboarding-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-0.35rem);
+  }
+}
+
+@layer utilities {
+  .animate-onboarding-welcome {
+    animation: onboarding-welcome-up 420ms ease-out both;
+  }
+
+  .animate-onboarding-request {
+    animation: onboarding-request-up 520ms 100ms ease-out both;
+  }
+
+  .animate-onboarding-orbit {
+    animation: onboarding-orbit 900ms linear infinite;
+  }
+
+  .animate-onboarding-pulse {
+    animation: onboarding-pulse 1.4s ease-in-out infinite;
+  }
+
+  .animate-onboarding-dot {
+    animation: onboarding-dot 1.2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-onboarding-welcome,
+  .animate-onboarding-request,
+  .animate-onboarding-orbit,
+  .animate-onboarding-pulse,
+  .animate-onboarding-dot {
+    animation: none;
+  }
+}

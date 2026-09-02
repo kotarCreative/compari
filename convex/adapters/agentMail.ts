@@ -110,22 +110,24 @@ export class AgentMailSdkAdapter implements AgentMailPort {
   async provisionInbox(input: ProvisionInboxInput): Promise<ProvisionedInbox> {
     const client = this.client()
     const podId = await this.podId()
-    let inbox
-    try {
-      inbox = await client.pods.inboxes.create(podId, {
-        username: input.username,
-        displayName: input.displayName,
-        clientId: input.clientId,
-      })
-    } catch (error) {
-      if (!isResourceTakenError(error)) throw error
-      inbox = await client.pods.inboxes.create(podId, {
-        username: collisionSafeUsername(input.username, input.clientId),
-        displayName: input.displayName,
-        clientId: input.clientId,
-      })
+    const firstNumber = stableNumber(input.clientId)
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const username =
+        attempt === 0
+          ? input.username
+          : numberedUsername(input.username, firstNumber + attempt - 1)
+      try {
+        const inbox = await client.pods.inboxes.create(podId, {
+          username,
+          displayName: input.displayName,
+          clientId: input.clientId,
+        })
+        return { inboxId: inbox.inboxId, emailAddress: inbox.email }
+      } catch (error) {
+        if (!isResourceTakenError(error) || attempt === 9) throw error
+      }
     }
-    return { inboxId: inbox.inboxId, emailAddress: inbox.email }
+    throw new Error('AgentMail inbox username allocation was exhausted')
   }
 
   async sendMessage(input: {
@@ -198,8 +200,12 @@ function stableId(value: string) {
   return (hash >>> 0).toString(36)
 }
 
-function collisionSafeUsername(username: string, clientId: string): string {
-  const suffix = stableId(clientId).slice(0, 7)
+function stableNumber(value: string): number {
+  return (Number.parseInt(stableId(value), 36) % 9_000) + 1_000
+}
+
+function numberedUsername(username: string, number: number): string {
+  const suffix = String(number)
   return `${username.slice(0, 24 - suffix.length)}${suffix}`
 }
 

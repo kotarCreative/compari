@@ -3,6 +3,7 @@ import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { CenteredMessage } from '~/components/common/CenteredMessage'
 import { FirstSearch } from '~/features/workspace/FirstSearch'
+import { NameOnboarding } from '~/features/workspace/NameOnboarding'
 import { WorkspaceShell } from '~/features/workspace/WorkspaceShell'
 import { usersApi } from '~/features/workspace/contracts'
 
@@ -51,5 +52,6 @@ function Bootstrap() {
         title="Preparing your buyer workspace…"
       />
     )
+  if (!profile.hasConfirmedName) return <NameOnboarding profile={profile} />
   return <WorkspaceShell profile={profile} />
 }

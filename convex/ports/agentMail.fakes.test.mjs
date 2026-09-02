@@ -162,7 +162,7 @@ test('official AgentMail adapter retries a taken username deterministically', as
       inboxes: {
         create: async (...args) => {
           calls.push(args)
-          if (calls.length === 1) throw taken
+          if (calls.length < 3) throw taken
           return { inboxId: 'inbox_2', email: 'buyer123@agentmail.to' }
         },
       },
@@ -178,9 +178,13 @@ test('official AgentMail adapter retries a taken username deterministically', as
     }),
     { inboxId: 'inbox_2', emailAddress: 'buyer123@agentmail.to' },
   )
-  assert.equal(calls.length, 2)
+  assert.equal(calls.length, 3)
   assert.equal(calls[0][1].username, 'buyer')
-  assert.notEqual(calls[1][1].username, 'buyer')
+  assert.match(calls[1][1].username, /^buyer\d+$/)
+  assert.equal(
+    Number(calls[2][1].username.slice('buyer'.length)),
+    Number(calls[1][1].username.slice('buyer'.length)) + 1,
+  )
   assert.equal(calls[1][1].clientId, calls[0][1].clientId)
-  assert.ok(calls[1][1].username.length <= 24)
+  assert.ok(calls[2][1].username.length <= 24)
 })

@@ -57,6 +57,8 @@ export const load = internalQuery({
       !['researching', 'contacting'].includes(request.status) ||
       candidate.status !== 'queued_for_contact' ||
       !user.agentMailInboxId ||
+      !user.name ||
+      user.nameConfirmedAt === undefined ||
       endpoint.type !== (attempt.method === 'email' ? 'email' : 'contact_form')
     )
       return null
@@ -81,7 +83,7 @@ export const load = internalQuery({
         .first(),
     ])
     const subject = `Information request: ${request.title}`
-    const body = `I’m coordinating options on behalf of a buyer. Could you share price, availability, scope, exclusions, and timing for: ${request.prompt.slice(0, 1200)}\n\nPlease reply to ${user.agentEmailAddress} with factual details only.`
+    const body = `I’m coordinating options on behalf of a buyer. Could you share price, availability, scope, exclusions, and timing for: ${request.prompt.slice(0, 1200)}\n\nPlease reply to ${user.agentEmailAddress} with factual details only.\n\nThanks,\n${user.name}`
     if (
       validateOutboundPreflight({
         requestStatus: request.status,

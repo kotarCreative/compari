@@ -52,6 +52,7 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     tokenIdentifier: v.optional(v.string()),
+    nameConfirmedAt: v.optional(v.number()),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
     agentMailInboxId: v.optional(v.string()),
@@ -113,7 +114,12 @@ export default defineSchema({
     .index('by_status_and_scheduled_at', ['status', 'scheduledAt'])
     .index('by_user_and_kind', ['userId', 'kind'])
     .index('by_request_id_and_created_at', ['requestId', 'createdAt'])
-    .index('by_request_id_and_kind_and_status_and_input_version', ['requestId', 'kind', 'status', 'inputVersion']),
+    .index('by_request_id_and_kind_and_status_and_input_version', [
+      'requestId',
+      'kind',
+      'status',
+      'inputVersion',
+    ]),
   procurementRequests: defineTable({
     userId: v.id('users'),
     prompt: v.string(),
@@ -144,7 +150,15 @@ export default defineSchema({
     evaluationInputVersion: v.optional(v.number()),
     evaluationPreference: v.optional(v.string()),
     demoKey: v.optional(v.string()),
-    rankingStatus: v.optional(v.union(v.literal('pending'), v.literal('running'), v.literal('ready'), v.literal('retryable_failure'), v.literal('needs_user'))),
+    rankingStatus: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('running'),
+        v.literal('ready'),
+        v.literal('retryable_failure'),
+        v.literal('needs_user'),
+      ),
+    ),
     rankingError: v.optional(v.string()),
     rankingVersion: v.optional(v.number()),
     createdAt: v.number(),
@@ -186,7 +200,14 @@ export default defineSchema({
     rejectionSummary: v.optional(v.string()),
     shortlistReason: v.optional(v.string()),
     shortlistRank: v.optional(v.number()),
-    recommendationStatus: v.optional(v.union(v.literal('unranked'), v.literal('recommended'), v.literal('not_recommended'), v.literal('selected'))),
+    recommendationStatus: v.optional(
+      v.union(
+        v.literal('unranked'),
+        v.literal('recommended'),
+        v.literal('not_recommended'),
+        v.literal('selected'),
+      ),
+    ),
     recommendationScore: v.optional(v.number()),
     recommendationReason: v.optional(v.string()),
     recommendationCaveats: v.optional(v.array(v.string())),
@@ -199,7 +220,10 @@ export default defineSchema({
     .index('by_request_id', ['requestId'])
     .index('by_request_id_and_business_id', ['requestId', 'businessId'])
     .index('by_request_id_and_status', ['requestId', 'status'])
-    .index('by_request_id_and_recommendation_status', ['requestId', 'recommendationStatus']),
+    .index('by_request_id_and_recommendation_status', [
+      'requestId',
+      'recommendationStatus',
+    ]),
   contactEndpoints: defineTable({
     businessId: v.id('businesses'),
     type: v.union(
