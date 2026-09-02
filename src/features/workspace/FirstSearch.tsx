@@ -123,7 +123,10 @@ export function FirstSearch() {
                 minLength={12}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && event.metaKey) {
+                  if (
+                    event.key === 'Enter' &&
+                    (event.metaKey || event.ctrlKey)
+                  ) {
                     event.preventDefault()
                     event.currentTarget.form?.requestSubmit()
                   }
@@ -134,7 +137,7 @@ export function FirstSearch() {
               />
             </div>
             <p className="text-xs text-slate-500">
-              Press <kbd className="font-sans">⌘</kbd> +{' '}
+              Press <kbd className="font-sans">⌘/Ctrl</kbd> +{' '}
               <kbd className="font-sans">Enter</kbd> to start searching for
               vendors.
             </p>
