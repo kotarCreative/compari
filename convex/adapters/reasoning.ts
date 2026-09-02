@@ -60,7 +60,7 @@ const intakeSchema = {
     'clarifyingQuestions',
   ],
   properties: {
-    schemaVersion: { const: 1 },
+    schemaVersion: { type: 'integer', enum: [1] },
     title: { type: 'string', maxLength: 120 },
     location: { type: ['string', 'null'], maxLength: 160 },
     requirements: {
@@ -110,7 +110,7 @@ const providerResponseSchema = {
     'confidence',
   ],
   properties: {
-    schemaVersion: { const: 1 },
+    schemaVersion: { type: 'integer', enum: [1] },
     facts: {
       type: 'array',
       maxItems: 12,

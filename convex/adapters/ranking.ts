@@ -19,7 +19,7 @@ export function getRankingPort(): RankingPort {
         additionalProperties: false,
         required: ['schemaVersion', 'rankings'],
         properties: {
-          schemaVersion: { const: 1 },
+          schemaVersion: { type: 'integer', enum: [1] },
           rankings: {
             type: 'array',
             maxItems: 5,

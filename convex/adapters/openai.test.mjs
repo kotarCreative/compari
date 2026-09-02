@@ -27,5 +27,23 @@ test('AI SDK non-retryable failures require configuration attention', () => {
     isRetryable: false,
   })
 
-  assert.match(openAIWorkflowError(error, 'ranking').message, /^needs_user:/)
+  assert.equal(
+    openAIWorkflowError(error, 'ranking').message,
+    'needs_user: OpenAI rejected the configured API key for ranking',
+  )
+})
+
+test('AI SDK invalid requests identify request configuration', () => {
+  const error = new APICallError({
+    message: 'invalid schema',
+    url: 'https://api.openai.com/v1/responses',
+    requestBodyValues: {},
+    statusCode: 400,
+    isRetryable: false,
+  })
+
+  assert.equal(
+    openAIWorkflowError(error, 'reasoning').message,
+    'needs_user: OpenAI rejected the reasoning request configuration',
+  )
 })

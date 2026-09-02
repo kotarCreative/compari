@@ -59,10 +59,28 @@ export function openAIWorkflowError(
   operation: OpenAIOperation,
 ): Error {
   const cause = RetryError.isInstance(error) ? error.lastError : error
-  if (APICallError.isInstance(cause) && cause.isRetryable)
-    return new Error(
-      `retryable_external: OpenAI ${operation} is temporarily unavailable`,
-    )
+  if (APICallError.isInstance(cause)) {
+    if (cause.isRetryable)
+      return new Error(
+        `retryable_external: OpenAI ${operation} is temporarily unavailable`,
+      )
+    if (cause.statusCode === 400)
+      return new Error(
+        `needs_user: OpenAI rejected the ${operation} request configuration`,
+      )
+    if (cause.statusCode === 401)
+      return new Error(
+        `needs_user: OpenAI rejected the configured API key for ${operation}`,
+      )
+    if (cause.statusCode === 403)
+      return new Error(
+        `needs_user: OpenAI API project lacks permission for ${operation}`,
+      )
+    if (cause.statusCode === 404)
+      return new Error(
+        `needs_user: OpenAI model configured for ${operation} is unavailable`,
+      )
+  }
   if (
     NoObjectGeneratedError.isInstance(cause) ||
     NoOutputGeneratedError.isInstance(cause)
