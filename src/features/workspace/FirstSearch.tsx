@@ -8,7 +8,7 @@ import {
   requestPromptPlaceholder,
   splitFullName,
 } from './constants'
-import { OnboardingTransition } from './OnboardingTransition'
+import { RequestConversation } from './RequestConversation'
 import type { FormEvent } from 'react'
 import { Input, Label, Textarea } from '~/components/ui'
 
@@ -59,10 +59,15 @@ export function FirstSearch() {
 
   if (isStarting) {
     return (
-      <OnboardingTransition
-        firstName={parsedName?.firstName}
-        title="Creating your workspace"
-      />
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
+        <p className="mb-10 text-sm font-semibold tracking-[0.22em] text-sky-600">
+          COMPARI
+        </p>
+        <RequestConversation
+          loaderPhase="interpreting"
+          prompt={prompt.trim()}
+        />
+      </main>
     )
   }
 

@@ -12,6 +12,7 @@ test('deterministic reasoning returns a versioned DTO for canonical demo fixture
   const intake = await port.extractRequirements({
     prompt: 'I need 500 matte brochures under $700 by next Friday.',
     timezone: 'UTC',
+    answeredQuestions: [],
     corrections: [
       {
         key: 'budget',
@@ -45,11 +46,33 @@ test('production reasoning remains fail-closed without an OpenAI key', async () 
         prompt: 'Need a printer',
         timezone: 'UTC',
         corrections: [],
+        answeredQuestions: [],
       }),
     /OpenAI reasoning is not configured/,
   )
   if (previous !== undefined) process.env.COMPARI_DEMO_MODE = previous
   if (previousKey !== undefined) process.env.OPENAI_API_KEY = previousKey
+})
+
+test('deterministic reasoning does not repeat an answered intake question', async () => {
+  const port = createDeterministicReasoningPort()
+  const intake = await port.extractRequirements({
+    prompt: 'I need help finding a suitable local vendor.',
+    timezone: 'UTC',
+    corrections: [],
+    answeredQuestions: [
+      {
+        question:
+          'What quantity, budget, and deadline should providers quote against?',
+        answer: '100 units, up to $2,000, by October 1.',
+      },
+    ],
+  })
+  assert.deepEqual(intake.clarifyingQuestions, [])
+  assert.equal(
+    intake.requirements[0]?.value,
+    '100 units, up to $2,000, by October 1.',
+  )
 })
 
 test('structured output normalization preserves bounded intake data', () => {

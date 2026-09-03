@@ -5,10 +5,12 @@ import {
   minimumOnboardingDurationMs,
   onboardingStartedAtKey,
   pendingFirstNameKey,
+  pendingFirstRequestKey,
   pendingLastNameKey,
   splitFullName,
 } from './constants'
 import { OnboardingTransition } from './OnboardingTransition'
+import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
 import { Button, Input, Label } from '~/components/ui'
 
@@ -19,9 +21,11 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
   const [phase, setPhase] = useState<'checking' | 'saving' | 'ready'>(
     'checking',
   )
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
   const didAutoComplete = useRef(false)
 
   useEffect(() => {
+    setPendingPrompt(sessionStorage.getItem(pendingFirstRequestKey))
     const firstName = sessionStorage.getItem(pendingFirstNameKey)
     const lastName = sessionStorage.getItem(pendingLastNameKey)
 
@@ -90,6 +94,18 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
   }
 
   if (phase !== 'ready') {
+    if (pendingPrompt)
+      return (
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
+          <p className="mb-10 text-sm font-semibold tracking-[0.22em] text-sky-600">
+            COMPARI
+          </p>
+          <RequestConversation
+            loaderPhase="interpreting"
+            prompt={pendingPrompt}
+          />
+        </main>
+      )
     return (
       <OnboardingTransition
         firstName={splitFullName(fullName)?.firstName}

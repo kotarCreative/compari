@@ -6,6 +6,8 @@ import { DemoModeBanner } from '../decision/DemoModeBanner'
 import { RequestDetail } from '../request/RequestDetail'
 import { pendingFirstRequestKey, requestPromptPlaceholder } from './constants'
 import { requestsApi, usersApi } from './contracts'
+import { FirstRequestOnboarding } from './FirstRequestOnboarding'
+import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
 import type { FormEvent } from 'react'
 import { errorMessage } from '~/lib/errors'
@@ -25,6 +27,31 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
   const retryInbox = useMutation(usersApi.users.retryMyInboxProvisioning)
   const [retryError, setRetryError] = useState<string | null>(null)
   const [isRetryingInbox, setIsRetryingInbox] = useState(false)
+  const [pendingFirstPrompt, setPendingFirstPrompt] = useState<
+    string | null | undefined
+  >(undefined)
+  const [firstRequestId, setFirstRequestId] = useState<string | null>(null)
+  const [firstRequestPrompt, setFirstRequestPrompt] = useState<string | null>(
+    null,
+  )
+
+  useEffect(() => {
+    setPendingFirstPrompt(window.sessionStorage.getItem(pendingFirstRequestKey))
+  }, [])
+
+  if (pendingFirstPrompt === undefined) return null
+  if (pendingFirstPrompt)
+    return (
+      <FirstRequestOnboarding
+        onComplete={(requestId) => {
+          setFirstRequestId(requestId)
+          setFirstRequestPrompt(pendingFirstPrompt)
+          setPendingFirstPrompt(null)
+        }}
+        prompt={pendingFirstPrompt}
+      />
+    )
+
   const status = profile.inboxProvisioningStatus ?? 'pending'
   const inboxDetail =
     status === 'ready'
@@ -104,12 +131,21 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
         </Card>
       </section>
       <DemoModeBanner />
-      <RequestWorkspace />
+      <RequestWorkspace
+        initialRequestId={firstRequestId}
+        initialRequestPrompt={firstRequestPrompt}
+      />
     </main>
   )
 }
 
-function RequestWorkspace() {
+function RequestWorkspace({
+  initialRequestId,
+  initialRequestPrompt,
+}: {
+  initialRequestId: string | null
+  initialRequestPrompt: string | null
+}) {
   const create = useMutation(requestsApi.requests.create)
   const pause = useMutation(requestsApi.requests.pauseAutomation)
   const resume = useMutation(requestsApi.requests.resumeAutomation)
@@ -119,36 +155,24 @@ function RequestWorkspace() {
   const [prompt, setPrompt] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(
+    initialRequestPrompt,
+  )
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(
     null,
   )
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
-    null,
+    initialRequestId,
   )
-
-  useEffect(() => {
-    const pendingPrompt = window.sessionStorage.getItem(pendingFirstRequestKey)
-    if (!pendingPrompt) return
-    window.sessionStorage.removeItem(pendingFirstRequestKey)
-    setPrompt(pendingPrompt)
-    setIsCreating(true)
-    void create({ prompt: pendingPrompt })
-      .then((requestId) => {
-        setPrompt('')
-        setSelectedRequestId(requestId)
-      })
-      .catch((reason) =>
-        setError(errorMessage(reason, 'Unable to create request.')),
-      )
-      .finally(() => setIsCreating(false))
-  }, [create])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    const nextPrompt = prompt.trim()
+    setSubmittedPrompt(nextPrompt)
     setIsCreating(true)
     try {
-      const requestId = await create({ prompt })
+      const requestId = await create({ prompt: nextPrompt })
       setPrompt('')
       setSelectedRequestId(requestId)
     } catch (reason) {
@@ -161,9 +185,23 @@ function RequestWorkspace() {
   if (selectedRequestId)
     return (
       <RequestDetail
-        onClose={() => setSelectedRequestId(null)}
+        onClose={() => {
+          setSelectedRequestId(null)
+          setSubmittedPrompt(null)
+        }}
+        requestPrompt={submittedPrompt ?? ''}
         requestId={selectedRequestId}
       />
+    )
+
+  if (isCreating && submittedPrompt)
+    return (
+      <section className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-800">
+        <RequestConversation
+          loaderPhase="interpreting"
+          prompt={submittedPrompt}
+        />
+      </section>
     )
 
   return (
@@ -261,7 +299,10 @@ function RequestWorkspace() {
                         : 'Pause automation'}
                   </Button>
                   <Button
-                    onClick={() => setSelectedRequestId(request._id)}
+                    onClick={() => {
+                      setSubmittedPrompt(request.prompt)
+                      setSelectedRequestId(request._id)
+                    }}
                     size="sm"
                   >
                     Open workspace

@@ -4,6 +4,8 @@ import {
   canResearch,
   moveCandidateCount,
   normalizeDomain,
+  normalizedQuestionKey,
+  questionsAreSimilar,
   transitionCandidate,
   transitionRequest,
 } from './workflowState.ts'
@@ -14,6 +16,30 @@ test('request transitions permit bounded progression and reject invalid selectio
   assert.throws(
     () => transitionRequest('draft', 'completed'),
     /cannot transition/,
+  )
+})
+
+test('question keys ignore punctuation, casing, and repeated whitespace', () => {
+  assert.equal(
+    normalizedQuestionKey(' What is your budget? '),
+    normalizedQuestionKey('WHAT  is your budget!!!'),
+  )
+})
+
+test('question similarity catches paraphrased duplicate intake questions', () => {
+  assert.equal(
+    questionsAreSimilar(
+      'What is the location of the tree to be cut down?',
+      'What is the location of the tree that needs to be cut down?',
+    ),
+    true,
+  )
+  assert.equal(
+    questionsAreSimilar(
+      'What is the location of the tree?',
+      'What is your maximum budget?',
+    ),
+    false,
   )
 })
 

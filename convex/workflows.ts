@@ -41,6 +41,7 @@ export const extractRequirements = internalAction({
         prompt: request.prompt,
         timezone: 'UTC',
         corrections: request.corrections,
+        answeredQuestions: request.answeredQuestions,
       })
       await ctx.runMutation(internal.workflowState.completeIntake, {
         ...args,

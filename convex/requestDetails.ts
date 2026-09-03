@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { query } from './_generated/server'
+import { questionsAreSimilar } from './domain/workflowState'
 import { requireOwnedRequest } from './lib/auth'
 import type { Id } from './_generated/dataModel'
 
@@ -16,6 +17,7 @@ export const get = query({
       status: v.string(),
       automationPaused: v.boolean(),
       version: v.number(),
+      interpretedVersion: v.optional(v.number()),
       researchStatus: v.string(),
       rankingStatus: v.optional(v.string()),
       rankingError: v.optional(v.string()),
@@ -270,6 +272,16 @@ export const get = query({
         })),
       })
     }
+    const answeredQuestionTexts = questions.flatMap((question) =>
+      question.status === 'answered' ? [question.text] : [],
+    )
+    const visibleQuestions = questions.filter(
+      (question) =>
+        question.status !== 'open' ||
+        !answeredQuestionTexts.some((answered) =>
+          questionsAreSimilar(answered, question.text),
+        ),
+    )
     return {
       request: {
         _id: request._id,
@@ -279,6 +291,7 @@ export const get = query({
         status: request.status,
         automationPaused: request.automationPaused,
         version: request.version,
+        interpretedVersion: request.interpretedVersion,
         researchStatus: request.researchStatus,
         rankingStatus: request.rankingStatus,
         rankingError: request.rankingError,
@@ -295,7 +308,7 @@ export const get = query({
         importance: item.importance,
         confidence: item.confidence,
       })),
-      questions: questions.map((item) => ({
+      questions: visibleQuestions.map((item) => ({
         _id: item._id,
         candidateId: item.candidateId,
         text: item.text,

@@ -3,6 +3,7 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOwnedRequest } from './lib/auth'
 import { followUpIdempotencyKey } from './domain/followUpPolicy'
+import { questionsAreSimilar } from './domain/workflowState'
 import type { FunctionReference } from 'convex/server'
 import type { Id } from './_generated/dataModel'
 
@@ -83,28 +84,56 @@ export const answerForRequest = mutation({
       supportingFactIds: [...question.supportingFactIds, factId],
       updatedAt: now,
     })
-    const nextVersion = request.version + 1
-    await ctx.db.patch('procurementRequests', request._id, {
-      version: nextVersion,
-      updatedAt: now,
-    })
-    const jobId = await ctx.db.insert('sideEffectJobs', {
-      userId: request.userId,
-      kind: 'extract_requirements',
-      idempotencyKey: `extract-requirements:${request._id}:v${nextVersion}`,
-      status: 'pending',
-      attemptCount: 0,
-      maxAttempts: 3,
-      requestId: request._id,
-      inputVersion: nextVersion,
-      scheduledAt: now,
-      createdAt: now,
-      updatedAt: now,
-    })
-    await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
-      requestId: request._id,
-      jobId,
-    })
+    const requestQuestions = await ctx.db
+      .query('questions')
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+      .take(100)
+    const answeredQuestionTexts = requestQuestions.flatMap((item) =>
+      item.status === 'answered' ? [item.text] : [],
+    )
+    const remainingOpenQuestions = requestQuestions.filter(
+      (item) =>
+        item.status === 'open' &&
+        !answeredQuestionTexts.some((answered) =>
+          questionsAreSimilar(answered, item.text),
+        ),
+    )
+    for (const item of requestQuestions) {
+      if (item.status === 'open' && !remainingOpenQuestions.includes(item))
+        await ctx.db.patch('questions', item._id, {
+          status: 'resolved',
+          updatedAt: now,
+        })
+    }
+    const shouldReinterpret =
+      question.candidateId === undefined &&
+      !remainingOpenQuestions.some((item) => item.candidateId === undefined)
+    const nextVersion = shouldReinterpret
+      ? request.version + 1
+      : request.version
+    if (shouldReinterpret) {
+      await ctx.db.patch('procurementRequests', request._id, {
+        version: nextVersion,
+        updatedAt: now,
+      })
+      const jobId = await ctx.db.insert('sideEffectJobs', {
+        userId: request.userId,
+        kind: 'extract_requirements',
+        idempotencyKey: `extract-requirements:${request._id}:v${nextVersion}`,
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: 3,
+        requestId: request._id,
+        inputVersion: nextVersion,
+        scheduledAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })
+      await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+        requestId: request._id,
+        jobId,
+      })
+    }
     if (question.providerMessageId && question.candidateId) {
       const followUpJobId = await ctx.db.insert('sideEffectJobs', {
         userId: request.userId,

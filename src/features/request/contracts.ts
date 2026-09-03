@@ -12,6 +12,7 @@ export type RequestDetailValue = {
     status: string
     automationPaused: boolean
     version: number
+    interpretedVersion?: number
     researchStatus: string
     rankingStatus?: string
     rankingError?: string

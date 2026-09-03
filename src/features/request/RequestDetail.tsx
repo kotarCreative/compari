@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DecisionPanel } from '../decision/DecisionPanel'
+import { RequestConversation } from '../workspace/RequestConversation'
 import { ResearchSummary, WorkflowNotice } from './components/RequestOverview'
 import { productApi } from './contracts'
 import { EvidenceDrawer } from './EvidenceDrawer'
@@ -17,9 +18,11 @@ import { Alert, Button, Input } from '~/components/ui'
 
 export function RequestDetail({
   requestId,
+  requestPrompt,
   onClose,
 }: {
   requestId: string
+  requestPrompt: string
   onClose: () => void
 }) {
   const detail = useQuery(productApi.requestDetails.get, { requestId })
@@ -34,10 +37,24 @@ export function RequestDetail({
   const [error, setError] = useState<string | null>(null)
   const [isRetryingIntake, setIsRetryingIntake] = useState(false)
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
+  const answerQuestion = useMutation(productApi.questions.answerForRequest)
+  const [answerDraft, setAnswerDraft] = useState('')
+  const [isAnswering, setIsAnswering] = useState(false)
+  const firstOpenQuestion = detail?.questions.find(
+    (question) => question.status === 'open',
+  )
+
+  useEffect(() => {
+    setAnswerDraft('')
+  }, [firstOpenQuestion?._id])
+
   if (detail === undefined)
     return (
-      <section className="mt-6 rounded-xl border p-5 text-sm">
-        Loading request workspace…
+      <section className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-800">
+        <RequestConversation
+          loaderPhase="interpreting"
+          prompt={requestPrompt}
+        />
       </section>
     )
   const candidateNames = new Map(
@@ -55,9 +72,6 @@ export function RequestDetail({
             REQUEST WORKSPACE
           </p>
           <h2 className="text-2xl font-bold">{detail.request.title}</h2>
-          <p className="mt-2 max-w-3xl whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
-            Original prompt: {detail.request.prompt}
-          </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={onClose} size="sm" variant="outline">
@@ -86,6 +100,43 @@ export function RequestDetail({
         </div>
       </header>
       {error ? <Alert variant="destructive">{error}</Alert> : null}
+      <RequestConversation
+        answer={answerDraft}
+        history={detail.questions.flatMap((question) =>
+          question.answer
+            ? [
+                {
+                  id: question._id,
+                  text: question.text,
+                  importance: question.importance,
+                  answer: question.answer,
+                },
+              ]
+            : [],
+        )}
+        isAnswering={isAnswering}
+        loaderPhase={
+          detail.request.status === 'draft' ? 'interpreting' : undefined
+        }
+        onAnswerChange={setAnswerDraft}
+        onAnswerSubmit={(event) => {
+          event.preventDefault()
+          if (!firstOpenQuestion) return
+          setError(null)
+          setIsAnswering(true)
+          void answerQuestion({
+            questionId: firstOpenQuestion._id,
+            answer: answerDraft,
+          })
+            .then(() => setAnswerDraft(''))
+            .catch((reason) =>
+              setError(errorMessage(reason, 'Answer could not be saved.')),
+            )
+            .finally(() => setIsAnswering(false))
+        }}
+        prompt={detail.request.prompt}
+        question={firstOpenQuestion}
+      />
       <WorkflowNotice
         diagnostics={diagnostics}
         isRetrying={isRetryingIntake}
@@ -113,7 +164,6 @@ export function RequestDetail({
       />
       <EvidenceDrawer evidence={evidence} />
       <Requirements detail={detail} onError={setError} />
-      <Questions questions={detail.questions} onError={setError} />
       <Candidates candidates={detail.candidates} onEvidence={setEvidence} />
       <Outreach
         attempts={detail.outreach}
@@ -441,65 +491,6 @@ function Requirements({
           </Button>
         </div>
       </form>
-    </section>
-  )
-}
-
-function Questions({
-  questions,
-  onError,
-}: {
-  questions: Detail['questions']
-  onError: (value: string | null) => void
-}) {
-  const answer = useMutation(productApi.questions.answerForRequest)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const open = questions.filter((question) => question.status === 'open')
-  return (
-    <section>
-      <h3 className="text-lg font-semibold">Needs you</h3>
-      {open.length ? (
-        <div className="mt-2 space-y-2">
-          {open.map((question) => (
-            <form
-              className="rounded border p-3"
-              key={question._id}
-              onSubmit={(event) => {
-                event.preventDefault()
-                void answer({
-                  questionId: question._id,
-                  answer: answers[question._id] ?? '',
-                }).catch(() => onError('Answer could not be saved.'))
-              }}
-            >
-              <p className="text-sm">
-                <strong>{question.importance}</strong> — {question.text}
-              </p>
-              <div className="mt-2 flex gap-2">
-                <Input
-                  className="min-w-0 flex-1"
-                  onChange={(event) =>
-                    setAnswers({
-                      ...answers,
-                      [question._id]: event.target.value,
-                    })
-                  }
-                  placeholder="Your factual answer"
-                  required
-                  value={answers[question._id] ?? ''}
-                />
-                <Button size="sm" type="submit" variant="outline">
-                  Answer
-                </Button>
-              </div>
-            </form>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-1 text-sm text-slate-500">
-          No open buyer questions. Independent research can continue.
-        </p>
-      )}
     </section>
   )
 }

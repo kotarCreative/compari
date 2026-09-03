@@ -128,6 +128,7 @@ export default defineSchema({
     status: requestStatus,
     automationPaused: v.boolean(),
     version: v.number(),
+    interpretedVersion: v.optional(v.number()),
     researchStatus: v.union(
       v.literal('not_started'),
       v.literal('in_progress'),

@@ -6,9 +6,18 @@ export type ExtractedRequirement = {
   importance?: number
   confidence: number
 }
+export type AnsweredQuestion = {
+  question: string
+  answer: string
+}
 export type ProviderExtraction = {
   schemaVersion: 1
-  facts: Array<{ key: string; label: string; value: string; confidence: number }>
+  facts: Array<{
+    key: string
+    label: string
+    value: string
+    confidence: number
+  }>
   proposal: {
     status: 'partial' | 'complete'
     summary: string
@@ -23,6 +32,7 @@ export interface ReasoningPort {
     prompt: string
     timezone: string
     corrections: Array<ExtractedRequirement>
+    answeredQuestions: Array<AnsweredQuestion>
   }) => Promise<{
     title: string
     location?: string
@@ -33,5 +43,7 @@ export interface ReasoningPort {
     }>
   }>
   /** The caller supplies provider content inside explicit untrusted delimiters. */
-  extractProviderResponse: (input: { delimitedBody: string }) => Promise<ProviderExtraction>
+  extractProviderResponse: (input: {
+    delimitedBody: string
+  }) => Promise<ProviderExtraction>
 }

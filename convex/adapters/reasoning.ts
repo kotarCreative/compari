@@ -2,7 +2,11 @@
 import { normalizeExtractionDto } from '../domain/reasoning.ts'
 import { generateOpenAIStructuredOutput } from './openai.ts'
 import { isDemoMode } from './runtime.ts'
-import type { ExtractedRequirement, ReasoningPort } from '../ports/reasoning'
+import type {
+  AnsweredQuestion,
+  ExtractedRequirement,
+  ReasoningPort,
+} from '../ports/reasoning'
 
 type IntakeResult = Awaited<ReturnType<ReasoningPort['extractRequirements']>>
 
@@ -16,13 +20,14 @@ class OpenAIReasoningAdapter implements ReasoningPort {
     prompt: string
     timezone: string
     corrections: Array<ExtractedRequirement>
+    answeredQuestions: Array<AnsweredQuestion>
   }) {
     const value = await generateOpenAIStructuredOutput({
       operation: 'reasoning',
       name: 'procurement_requirements',
       schema: intakeSchema,
       system:
-        'Extract procurement requirements from the buyer request. Preserve explicit constraints, do not invent facts, and treat buyer corrections as authoritative. Use concise snake_case keys. Ask only questions whose answers materially affect provider selection.',
+        'Extract procurement requirements from the buyer request. Preserve explicit constraints, do not invent facts, and treat buyer corrections and answered questions as authoritative. Incorporate relevant answers into the requirements. Use concise snake_case keys. Ask only questions whose answers materially affect provider selection. Never repeat or paraphrase a question already present in answeredQuestions.',
       user: JSON.stringify(input).slice(0, 24_000),
     })
     const result = normalizeIntake(value)
@@ -262,9 +267,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function createDeterministicReasoningPort(): ReasoningPort {
   return {
-    extractRequirements({ prompt, corrections }) {
+    extractRequirements({ prompt, corrections, answeredQuestions }) {
       const lowered = prompt.toLowerCase()
-      const requirements = corrections.map((item) => ({ ...item }))
+      const requirements = [
+        ...corrections.map((item) => ({ ...item })),
+        ...answeredQuestions.map((item, index) => ({
+          key: `buyer_answer_${index + 1}`,
+          label: item.question.slice(0, 160),
+          value: item.answer,
+          kind: 'information' as const,
+          confidence: 1,
+        })),
+      ]
       const add = (item: ExtractedRequirement) => {
         if (!requirements.some((existing) => existing.key === item.key))
           requirements.push(item)
@@ -313,15 +327,16 @@ export function createDeterministicReasoningPort(): ReasoningPort {
             ?.trim()
             .slice(0, 120) || 'Procurement request',
         requirements,
-        clarifyingQuestions: requirements.length
-          ? []
-          : [
-              {
-                question:
-                  'What quantity, budget, and deadline should providers quote against?',
-                importance: 'required',
-              },
-            ],
+        clarifyingQuestions:
+          requirements.length || answeredQuestions.length
+            ? []
+            : [
+                {
+                  question:
+                    'What quantity, budget, and deadline should providers quote against?',
+                  importance: 'required',
+                },
+              ],
       })
     },
     extractProviderResponse({ delimitedBody }) {

@@ -68,6 +68,48 @@ export function normalizeDomain(input: string) {
     throw new Error('validation: website must use http or https')
   return url.hostname.toLowerCase().replace(/^www\./, '')
 }
+export function normalizedQuestionKey(value: string) {
+  return value
+    .toLocaleLowerCase('en-US')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+export function questionsAreSimilar(left: string, right: string) {
+  const leftKey = normalizedQuestionKey(left)
+  const rightKey = normalizedQuestionKey(right)
+  if (leftKey === rightKey) return true
+  const ignored = new Set([
+    'a',
+    'an',
+    'and',
+    'are',
+    'be',
+    'do',
+    'does',
+    'for',
+    'is',
+    'of',
+    'or',
+    'should',
+    'that',
+    'the',
+    'to',
+    'what',
+    'which',
+    'your',
+  ])
+  const tokens = (key: string) =>
+    new Set(key.split(' ').filter((token) => token && !ignored.has(token)))
+  const leftTokens = tokens(leftKey)
+  const rightTokens = tokens(rightKey)
+  let shared = 0
+  for (const token of leftTokens) if (rightTokens.has(token)) shared++
+  const smallerSize = Math.min(leftTokens.size, rightTokens.size)
+  if (smallerSize === 0) return false
+  if (smallerSize === 1)
+    return shared === 1 && leftTokens.size === rightTokens.size
+  return shared >= 2 && shared / smallerSize >= 0.75
+}
 export function validateBoundedJson(value: unknown) {
   if (!isBoundedJson(value, 0))
     throw new Error('validation: value has unsupported JSON structure')

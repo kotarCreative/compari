@@ -3,6 +3,7 @@ import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import {
   normalizeDomain,
+  questionsAreSimilar,
   transitionCandidate,
   transitionRequest,
   validateBoundedJson,
@@ -127,6 +128,12 @@ export const loadRequestForJob = internalQuery({
           confidence: v.number(),
         }),
       ),
+      answeredQuestions: v.array(
+        v.object({
+          question: v.string(),
+          answer: v.string(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -141,10 +148,18 @@ export const loadRequestForJob = internalQuery({
       job.claimToken !== args.claimToken
     )
       return null
-    const corrections = await ctx.db
-      .query('requirements')
-      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
-      .take(100)
+    const [corrections, answeredQuestions] = await Promise.all([
+      ctx.db
+        .query('requirements')
+        .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+        .take(100),
+      ctx.db
+        .query('questions')
+        .withIndex('by_request_id_and_status', (q) =>
+          q.eq('requestId', request._id).eq('status', 'answered'),
+        )
+        .take(100),
+    ])
     return {
       prompt: request.prompt,
       location: request.location,
@@ -161,6 +176,11 @@ export const loadRequestForJob = internalQuery({
           importance: item.importance,
           confidence: item.confidence,
         })),
+      answeredQuestions: answeredQuestions.flatMap((question) =>
+        question.answer === undefined
+          ? []
+          : [{ question: question.text, answer: question.answer }],
+      ),
     }
   },
 })
@@ -245,15 +265,36 @@ export const completeIntake = internalMutation({
           createdAt: now,
         })
     }
-    const openQuestions = await ctx.db
+    const existingQuestions = await ctx.db
       .query('questions')
-      .withIndex('by_request_id_and_status', (q) =>
-        q.eq('requestId', request._id).eq('status', 'open'),
-      )
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
       .take(100)
+    const answeredQuestionTexts = existingQuestions.flatMap((question) =>
+      question.status === 'answered' ? [question.text] : [],
+    )
+    for (const question of existingQuestions) {
+      if (
+        question.status === 'open' &&
+        answeredQuestionTexts.some((answered) =>
+          questionsAreSimilar(answered, question.text),
+        )
+      )
+        await ctx.db.patch('questions', question._id, {
+          status: 'resolved',
+          updatedAt: now,
+        })
+    }
+    const knownQuestionTexts = existingQuestions.map(
+      (question) => question.text,
+    )
     for (const question of args.output.clarifyingQuestions.slice(0, 10)) {
       const text = question.question.trim().slice(0, 500)
-      if (text && !openQuestions.some((existing) => existing.text === text))
+      if (
+        text &&
+        !knownQuestionTexts.some((existing) =>
+          questionsAreSimilar(existing, text),
+        )
+      ) {
         await ctx.db.insert('questions', {
           requestId: request._id,
           text,
@@ -263,14 +304,19 @@ export const completeIntake = internalMutation({
           createdAt: now,
           updatedAt: now,
         })
+        knownQuestionTexts.push(text)
+      }
     }
     if (request.status === 'draft') transitionRequest('draft', 'researching')
     await ctx.db.patch('procurementRequests', request._id, {
       title: args.output.title.trim().slice(0, 120) || 'Procurement request',
       location: args.output.location?.trim().slice(0, 160) || request.location,
       status: request.status === 'draft' ? 'researching' : request.status,
+      interpretedVersion: request.version,
       researchStatus:
-        request.status === 'draft' ? 'in_progress' : request.researchStatus,
+        request.status === 'draft' || request.status === 'researching'
+          ? 'in_progress'
+          : request.researchStatus,
       updatedAt: now,
     })
     await ctx.db.patch('sideEffectJobs', job._id, {
@@ -309,6 +355,7 @@ export const completeIntake = internalMutation({
     return null
   },
 })
+
 export const recordDiscovery = internalMutation({
   args: {
     requestId: v.id('procurementRequests'),
