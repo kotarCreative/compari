@@ -1,7 +1,6 @@
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
-import { DecisionPanel } from '../decision/DecisionPanel'
 import { DemoModeBanner } from '../decision/DemoModeBanner'
 import { RequestDetail } from '../request/RequestDetail'
 import { pendingFirstRequestKey, requestPromptPlaceholder } from './constants'
@@ -308,10 +307,6 @@ function RequestWorkspace({
                     Open workspace
                   </Button>
                 </div>
-                <DecisionPanel
-                  requestId={request._id}
-                  status={request.status}
-                />
               </CardContent>
             </Card>
           ))

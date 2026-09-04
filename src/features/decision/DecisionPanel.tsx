@@ -6,7 +6,7 @@ import type {
   DecisionProposal as Proposal,
   DecisionProvider as Provider,
 } from './contracts'
-import { Alert, Button, Input } from '~/components/ui'
+import { Alert, Button } from '~/components/ui'
 
 export function DecisionPanel({
   requestId,
@@ -18,13 +18,8 @@ export function DecisionPanel({
   providers?: Array<Provider>
 }) {
   const data = useQuery(decisionApi.evaluations.list, { requestId })
-  const diagnostics = useQuery(decisionApi.diagnostics.getRequest, {
-    requestId,
-  })
   const proposals = useQuery(decisionApi.proposals.list, { requestId })
-  const reconfigure = useMutation(decisionApi.evaluations.reconfigure)
   const confirmChoice = useMutation(decisionApi.selections.confirmChoice)
-  const [instruction, setInstruction] = useState('')
   const [error, setError] = useState<string | null>(null)
   if (!data)
     return (
@@ -33,48 +28,18 @@ export function DecisionPanel({
   const received =
     proposals?.filter((proposal) => proposal.status === 'received') ?? []
   return (
-    <section className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+    <section className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
       <div>
-        <h4 className="font-semibold">Decision workspace</h4>
+        <h3 className="text-lg font-semibold">Compare your options</h3>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {data.evaluation?.recommendation ??
-            'Collecting comparable provider evidence. No provider is selected automatically.'}
+            'The comparison agent is preparing a side-by-side view.'}
         </p>
       </div>
       <ViewRenderer views={data.views} />
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          setError(null)
-          void reconfigure({ requestId, instruction })
-            .then(() => setInstruction(''))
-            .catch(() => setError('Could not update comparison preferences.'))
-        }}
-      >
-        <Input
-          className="min-w-0 flex-1"
-          value={instruction}
-          onChange={(event) => setInstruction(event.target.value)}
-          placeholder="e.g. ignore price and show delivery timing"
-          maxLength={500}
-        />
-        <Button
-          disabled={!instruction.trim()}
-          size="sm"
-          type="submit"
-          variant="outline"
-        >
-          Update lenses
-        </Button>
-      </form>
       {status === 'awaiting_selection' ? (
-        <div className="space-y-3 rounded border border-sky-300 p-3 text-sm">
-          <strong>Final confirmation</strong>
-          <p>
-            Confirmation records your decision only. It will not accept a quote,
-            book, pay, or contact a provider.
-          </p>
+        <div className="space-y-3 rounded-xl border border-sky-300 p-4 text-sm">
+          <strong>Make your choice</strong>
           {received.length ? (
             received.map((proposal) => (
               <ConfirmationCard
@@ -96,17 +61,6 @@ export function DecisionPanel({
         </div>
       ) : null}
       {error ? <Alert variant="destructive">{error}</Alert> : null}
-      <details className="text-xs text-slate-500">
-        <summary>Request diagnostics ({status})</summary>
-        <ul className="mt-2 list-disc pl-4">
-          {diagnostics?.jobs.map((job) => (
-            <li key={job._id}>
-              {job.kind}: {job.status}
-              {job.lastErrorSummary ? ` — ${job.lastErrorSummary}` : ''}
-            </li>
-          )) ?? <li>Loading operational state…</li>}
-        </ul>
-      </details>
     </section>
   )
 }
@@ -161,13 +115,6 @@ function ConfirmationCard({
           </dd>
         </div>
       </dl>
-      <p className="mt-3 text-xs text-amber-800 dark:text-amber-200">
-        Caveat: confirm exclusions, scope, and availability directly against the
-        retained evidence.{' '}
-        {provider?.factLabels.length
-          ? `Evidence on file: ${provider.factLabels.join(', ')}.`
-          : 'No linked website fact is available yet.'}
-      </p>
       <Button
         className="mt-3"
         onClick={() =>
@@ -183,7 +130,7 @@ function ConfirmationCard({
         size="sm"
         variant="outline"
       >
-        Confirm this current proposal
+        Choose this option
       </Button>
     </article>
   )
