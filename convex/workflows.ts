@@ -98,15 +98,27 @@ export const discoverProviders = internalAction({
       return null
     }
     try {
-      const results = await getWebResearchPort().searchProviders({
-        query: request.prompt,
+      const plan = await getReasoningPort().planProviderSearch({
+        prompt: request.prompt,
         location: request.location,
-        limit: 10,
+        requirements: request.corrections,
+        answeredQuestions: request.answeredQuestions,
       })
+      const resultBatches = await Promise.all(
+        plan.discoveryQueries.map((query) =>
+          getWebResearchPort().searchProviders({
+            query,
+            limit: 6,
+          }),
+        ),
+      )
+      const results = uniqueProviderResults(resultBatches, 10)
       await ctx.runMutation(internal.workflowState.recordDiscovery, {
         ...args,
         claimToken: claim.claimToken,
         results,
+        searchQueries: plan.discoveryQueries,
+        vendorDetailQuery: plan.vendorDetailQuery,
       })
     } catch (error) {
       const classified = classifyExternalError(error)
@@ -156,6 +168,7 @@ export const researchCandidate = internalAction({
     try {
       const pages = await getWebResearchPort().researchProvider({
         url: candidate.website,
+        query: candidate.vendorDetailQuery,
         limit: 5,
       })
       await ctx.runMutation(internal.workflowState.recordCandidateResearch, {
@@ -175,3 +188,31 @@ export const researchCandidate = internalAction({
     return null
   },
 })
+
+function uniqueProviderResults<T extends { url: string }>(
+  batches: ReadonlyArray<ReadonlyArray<T>>,
+  limit: number,
+): Array<T> {
+  const results: Array<T> = []
+  const domains = new Set<string>()
+  const longest = Math.max(0, ...batches.map((batch) => batch.length))
+  for (let row = 0; row < longest && results.length < limit; row++) {
+    for (const batch of batches) {
+      if (row >= batch.length) continue
+      const result = batch[row]
+      let domain: string
+      try {
+        domain = new URL(result.url).hostname
+          .replace(/^www\./, '')
+          .toLowerCase()
+      } catch {
+        continue
+      }
+      if (!domain || domains.has(domain)) continue
+      domains.add(domain)
+      results.push(result)
+      if (results.length === limit) break
+    }
+  }
+  return results
+}

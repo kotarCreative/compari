@@ -12,6 +12,7 @@ export interface WebResearchPort {
   }) => Promise<Array<ProviderSearchResult>>
   researchProvider: (input: {
     url: string
+    query: string
     limit: number
   }) => Promise<Array<ResearchPage>>
   submitContactForm: (input: {

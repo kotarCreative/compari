@@ -9,6 +9,7 @@ import type {
 } from '../ports/reasoning'
 
 type IntakeResult = Awaited<ReturnType<ReasoningPort['extractRequirements']>>
+type SearchPlan = Awaited<ReturnType<ReasoningPort['planProviderSearch']>>
 
 export function getReasoningPort(): ReasoningPort {
   if (isDemoMode()) return createDeterministicReasoningPort()
@@ -33,6 +34,26 @@ class OpenAIReasoningAdapter implements ReasoningPort {
     const result = normalizeIntake(value)
     if (!result)
       throw new Error('needs_user: OpenAI returned invalid requirement data')
+    return result
+  }
+
+  async planProviderSearch(input: {
+    prompt: string
+    location?: string
+    requirements: Array<ExtractedRequirement>
+    answeredQuestions: Array<AnsweredQuestion>
+  }) {
+    const value = await generateOpenAIStructuredOutput({
+      operation: 'reasoning',
+      name: 'provider_search_plan',
+      schema: providerSearchPlanSchema,
+      system:
+        'Plan web research for a procurement request. Infer the buyer intent from the original prompt, extracted requirements, and answered questions; answers are authoritative. Return 2 to 4 concise, distinct search-engine queries that look for actual vendors capable of fulfilling the request, not pages that merely repeat the buyer message. Include the service or product category and relevant location or capability terms. Do not include sensitive personal details. Also return a concise vendorDetailQuery containing the capability, pricing, service-area, and contact terms that should be investigated on each vendor website. Do not include URLs or site: operators.',
+      user: JSON.stringify(input).slice(0, 24_000),
+    })
+    const result = normalizeProviderSearchPlan(value)
+    if (!result)
+      throw new Error('needs_user: OpenAI returned an invalid search plan')
     return result
   }
 
@@ -161,6 +182,44 @@ const providerResponseSchema = {
     providerQuestion: { type: ['string', 'null'], maxLength: 500 },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
+}
+
+const providerSearchPlanSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['schemaVersion', 'discoveryQueries', 'vendorDetailQuery'],
+  properties: {
+    schemaVersion: { type: 'integer', enum: [1] },
+    discoveryQueries: {
+      type: 'array',
+      minItems: 2,
+      maxItems: 4,
+      items: { type: 'string', minLength: 3, maxLength: 240 },
+    },
+    vendorDetailQuery: { type: 'string', minLength: 3, maxLength: 240 },
+  },
+}
+
+export function normalizeProviderSearchPlan(value: unknown): SearchPlan | null {
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== 1 ||
+    !Array.isArray(value.discoveryQueries) ||
+    typeof value.vendorDetailQuery !== 'string'
+  )
+    return null
+  const discoveryQueries = [
+    ...new Set(
+      value.discoveryQueries.flatMap((query): Array<string> =>
+        typeof query === 'string' && query.trim().length >= 3
+          ? [query.trim().slice(0, 240)]
+          : [],
+      ),
+    ),
+  ].slice(0, 4)
+  const vendorDetailQuery = value.vendorDetailQuery.trim().slice(0, 240)
+  if (discoveryQueries.length < 2 || vendorDetailQuery.length < 3) return null
+  return { discoveryQueries, vendorDetailQuery }
 }
 
 export function normalizeIntake(value: unknown): IntakeResult | null {
@@ -337,6 +396,26 @@ export function createDeterministicReasoningPort(): ReasoningPort {
                   importance: 'required',
                 },
               ],
+      })
+    },
+    planProviderSearch({ prompt, location, requirements, answeredQuestions }) {
+      const intent = [
+        prompt.split(/[.!?\n]/)[0]?.trim(),
+        ...requirements
+          .slice(0, 4)
+          .map((item) => `${item.label} ${String(item.value)}`),
+        ...answeredQuestions.slice(0, 4).map((item) => item.answer),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .slice(0, 180)
+      const place = location?.trim() ? ` ${location.trim()}` : ''
+      return Promise.resolve({
+        discoveryQueries: [
+          `${intent}${place} vendor`,
+          `${intent}${place} supplier company`,
+        ],
+        vendorDetailQuery: `${intent} services capabilities pricing service area contact`,
       })
     },
     extractProviderResponse({ delimitedBody }) {

@@ -162,6 +162,9 @@ export default defineSchema({
     ),
     rankingError: v.optional(v.string()),
     rankingVersion: v.optional(v.number()),
+    searchQueries: v.optional(v.array(v.string())),
+    vendorDetailQuery: v.optional(v.string()),
+    searchPlanVersion: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

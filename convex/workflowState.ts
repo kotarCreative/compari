@@ -368,6 +368,8 @@ export const recordDiscovery = internalMutation({
         snippet: v.optional(v.string()),
       }),
     ),
+    searchQueries: v.array(v.string()),
+    vendorDetailQuery: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -455,6 +457,9 @@ export const recordDiscovery = internalMutation({
     })
     await ctx.db.patch('procurementRequests', request._id, {
       researchStatus: usableProviders ? 'complete' : 'empty',
+      searchQueries: args.searchQueries.slice(0, 4),
+      vendorDetailQuery: args.vendorDetailQuery.slice(0, 240),
+      searchPlanVersion: request.version,
       candidateCounts: {
         ...request.candidateCounts,
         discovered: request.candidateCounts.discovered + discovered,
@@ -495,7 +500,10 @@ export const loadCandidateForJob = internalQuery({
     jobId: v.id('sideEffectJobs'),
     claimToken: v.string(),
   },
-  returns: v.union(v.null(), v.object({ website: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({ website: v.string(), vendorDetailQuery: v.string() }),
+  ),
   handler: async (ctx, args) => {
     const candidate = await ctx.db.get('requestCandidates', args.candidateId)
     const job = await ctx.db.get('sideEffectJobs', args.jobId)
@@ -517,7 +525,14 @@ export const loadCandidateForJob = internalQuery({
       request.version !== candidate.inputVersion
     )
       return null
-    return { website: business.website }
+    return {
+      website: business.website,
+      vendorDetailQuery:
+        request.searchPlanVersion === request.version &&
+        request.vendorDetailQuery
+          ? request.vendorDetailQuery
+          : request.prompt.slice(0, 240),
+    }
   },
 })
 export const recordCandidateResearch = internalMutation({

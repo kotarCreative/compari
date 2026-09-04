@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   createDeterministicReasoningPort,
   normalizeIntake,
+  normalizeProviderSearchPlan,
   normalizeProviderResponse,
 } from './reasoning.ts'
 import { normalizeExtractionDto } from '../domain/reasoning.ts'
@@ -72,6 +73,45 @@ test('deterministic reasoning does not repeat an answered intake question', asyn
   assert.equal(
     intake.requirements[0]?.value,
     '100 units, up to $2,000, by October 1.',
+  )
+})
+
+test('provider search planning uses the original prompt and buyer answers', async () => {
+  const port = createDeterministicReasoningPort()
+  const plan = await port.planProviderSearch({
+    prompt: 'Find a venue for our company retreat.',
+    location: 'Canmore, Alberta',
+    requirements: [],
+    answeredQuestions: [
+      { question: 'How many guests?', answer: 'Space for 45 people' },
+    ],
+  })
+  assert.equal(plan.discoveryQueries.length, 2)
+  assert.match(plan.discoveryQueries[0] ?? '', /venue/i)
+  assert.match(plan.discoveryQueries[0] ?? '', /45 people/i)
+  assert.match(plan.discoveryQueries[0] ?? '', /Canmore, Alberta/i)
+  assert.match(plan.vendorDetailQuery, /pricing/i)
+})
+
+test('search plan normalization bounds and deduplicates agent queries', () => {
+  assert.deepEqual(
+    normalizeProviderSearchPlan({
+      schemaVersion: 1,
+      discoveryQueries: [' local caterer ', 'local caterer', 'event catering'],
+      vendorDetailQuery: 'menus pricing delivery area contact',
+    }),
+    {
+      discoveryQueries: ['local caterer', 'event catering'],
+      vendorDetailQuery: 'menus pricing delivery area contact',
+    },
+  )
+  assert.equal(
+    normalizeProviderSearchPlan({
+      schemaVersion: 1,
+      discoveryQueries: ['only one'],
+      vendorDetailQuery: 'details',
+    }),
+    null,
   )
 })
 

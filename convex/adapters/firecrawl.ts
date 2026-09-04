@@ -90,12 +90,16 @@ class FirecrawlAdapter implements WebResearchPort {
         const x = row as Record<string, unknown>
         const url = typeof x.url === 'string' ? x.url : ''
         if (!url) return []
+        let hostname: string
+        try {
+          hostname = new URL(url).hostname
+        } catch {
+          return []
+        }
         return [
           {
             name:
-              typeof x.title === 'string'
-                ? x.title.slice(0, 160)
-                : new URL(url).hostname,
+              typeof x.title === 'string' ? x.title.slice(0, 160) : hostname,
             url,
             snippet:
               typeof x.description === 'string'
@@ -108,8 +112,54 @@ class FirecrawlAdapter implements WebResearchPort {
   }
   async researchProvider(input: {
     url: string
+    query: string
     limit: number
   }): Promise<Array<ResearchPage>> {
+    const baseUrl = new URL(input.url)
+    const normalizedHost = baseUrl.hostname.replace(/^www\./, '').toLowerCase()
+    let discoveredUrls: Array<string> = []
+    if (input.limit > 1) {
+      try {
+        const detailResults = await this.searchProviders({
+          query: `site:${baseUrl.hostname} ${input.query}`.slice(0, 500),
+          limit: Math.min(input.limit - 1, 4),
+        })
+        discoveredUrls = detailResults.flatMap((result) => {
+          try {
+            const url = new URL(result.url)
+            return url.hostname.replace(/^www\./, '').toLowerCase() ===
+              normalizedHost
+              ? [url.toString()]
+              : []
+          } catch {
+            return []
+          }
+        })
+      } catch {
+        // Vendor-site discovery is an enhancement; the known page can still
+        // provide useful evidence when Firecrawl search is temporarily sparse.
+      }
+    }
+    const urls = [...new Set([baseUrl.toString(), ...discoveredUrls])].slice(
+      0,
+      input.limit,
+    )
+    const attempts = await Promise.allSettled(
+      urls.map((url) => this.scrapePage(url)),
+    )
+    const pages = attempts.flatMap((attempt): Array<ResearchPage> =>
+      attempt.status === 'fulfilled' && attempt.value ? [attempt.value] : [],
+    )
+    if (pages.length) return pages
+    const failure = attempts.find(
+      (attempt): attempt is PromiseRejectedResult =>
+        attempt.status === 'rejected',
+    )
+    if (failure) throw failure.reason
+    return []
+  }
+
+  private async scrapePage(url: string): Promise<ResearchPage | null> {
     let response: Response
     try {
       response = await fetch('https://api.firecrawl.dev/v2/scrape', {
@@ -119,7 +169,7 @@ class FirecrawlAdapter implements WebResearchPort {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: input.url,
+          url,
           formats: ['markdown'],
           onlyMainContent: true,
         }),
@@ -143,18 +193,16 @@ class FirecrawlAdapter implements WebResearchPort {
       typeof data !== 'object' ||
       typeof (data as { markdown?: unknown }).markdown !== 'string'
     )
-      return []
+      return null
     const row = data as { markdown: string; metadata?: { title?: unknown } }
-    return [
-      {
-        url: input.url,
-        title:
-          typeof row.metadata?.title === 'string'
-            ? row.metadata.title
-            : undefined,
-        markdown: row.markdown.slice(0, 20_000),
-      },
-    ].slice(0, input.limit)
+    return {
+      url,
+      title:
+        typeof row.metadata?.title === 'string'
+          ? row.metadata.title
+          : undefined,
+      markdown: row.markdown.slice(0, 20_000),
+    }
   }
   submitContactForm(): Promise<{ submissionId: string }> {
     return Promise.reject(

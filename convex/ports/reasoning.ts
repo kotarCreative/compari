@@ -10,6 +10,10 @@ export type AnsweredQuestion = {
   question: string
   answer: string
 }
+export type ProviderSearchPlan = {
+  discoveryQueries: Array<string>
+  vendorDetailQuery: string
+}
 export type ProviderExtraction = {
   schemaVersion: 1
   facts: Array<{
@@ -42,6 +46,12 @@ export interface ReasoningPort {
       importance: 'required' | 'useful'
     }>
   }>
+  planProviderSearch: (input: {
+    prompt: string
+    location?: string
+    requirements: Array<ExtractedRequirement>
+    answeredQuestions: Array<AnsweredQuestion>
+  }) => Promise<ProviderSearchPlan>
   /** The caller supplies provider content inside explicit untrusted delimiters. */
   extractProviderResponse: (input: {
     delimitedBody: string
