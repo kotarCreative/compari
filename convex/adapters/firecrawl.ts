@@ -66,6 +66,7 @@ class FirecrawlAdapter implements WebResearchPort {
         body: JSON.stringify({
           query: [input.query, input.location].filter(Boolean).join(' '),
           limit: Math.min(input.limit, 12),
+          sources: ['web'],
         }),
       })
     } catch {
@@ -78,13 +79,7 @@ class FirecrawlAdapter implements WebResearchPort {
           ? 'retryable_external: Firecrawl discovery is temporarily unavailable'
           : `permanent_external: Firecrawl search failed (${response.status})`,
       )
-    const rows =
-      payload &&
-      typeof payload === 'object' &&
-      Array.isArray((payload as { data?: unknown }).data)
-        ? (payload as { data: Array<unknown> }).data
-        : []
-    return rows
+    return firecrawlSearchResults(payload)
       .flatMap((row): Array<ProviderSearchResult> => {
         if (!row || typeof row !== 'object') return []
         const x = row as Record<string, unknown>
@@ -211,4 +206,15 @@ class FirecrawlAdapter implements WebResearchPort {
       ),
     )
   }
+}
+
+/** Firecrawl v2 groups results by source under `data.web`. Keep accepting the
+ * older array envelope so deployments can migrate without losing discovery. */
+export function firecrawlSearchResults(payload: unknown): Array<unknown> {
+  if (!payload || typeof payload !== 'object') return []
+  const data = (payload as { data?: unknown }).data
+  if (Array.isArray(data)) return data
+  if (!data || typeof data !== 'object') return []
+  const web = (data as { web?: unknown }).web
+  return Array.isArray(web) ? web : []
 }
