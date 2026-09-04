@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-02T03:22:59Z
+- **Last updated:** 2026-09-04T02:14:29Z
 
 ## Log
 
@@ -63,3 +63,15 @@ and name-first onboarding with signed outreach and a five-second progress flow
 
 The app is not publicly deployed. Deployment-backed verification of AgentMail,
 Firecrawl, inbound webhooks, and OpenAI remains pending.
+
+### 2026-09-04 - 006ad4e
+
+Turned first-run request intake into a conversation that records buyer answers,
+reinterprets requirements, and avoids repeating resolved questions
+(`src/features/workspace/`, `convex/questions.ts`, `convex/workflowState.ts`).
+Added intent-aware provider research: an OpenAI planning step creates multiple
+bounded vendor queries from the original prompt, location, requirements, and
+answered questions; Firecrawl deduplicates the results, finds relevant pages on
+each vendor site, and scrapes up to five pages (`convex/adapters/reasoning.ts`,
+`convex/adapters/firecrawl.ts`, `convex/workflows.ts`). Local tests, typecheck,
+lint, and the production build pass.
