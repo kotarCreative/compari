@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { DemoModeBanner } from '../decision/DemoModeBanner'
 import { RequestDetail } from '../request/RequestDetail'
 import { pendingFirstRequestKey, requestPromptPlaceholder } from './constants'
-import { requestsApi, usersApi } from './contracts'
+import { requestsApi } from './contracts'
 import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
@@ -23,9 +23,6 @@ import { StatusBadge } from '~/components/common/StatusBadge'
 
 export function WorkspaceShell({ profile }: { profile: Profile }) {
   const { signOut } = useAuthActions()
-  const retryInbox = useMutation(usersApi.users.retryMyInboxProvisioning)
-  const [retryError, setRetryError] = useState<string | null>(null)
-  const [isRetryingInbox, setIsRetryingInbox] = useState(false)
   const [pendingFirstPrompt, setPendingFirstPrompt] = useState<
     string | null | undefined
   >(undefined)
@@ -51,15 +48,10 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
       />
     )
 
-  const status = profile.inboxProvisioningStatus ?? 'pending'
-  const inboxDetail =
-    status === 'ready'
-      ? profile.agentEmailAddress
-      : status === 'permanent_failure'
-        ? 'Inbox setup failed and can be retried.'
-        : status === 'retryable_failure'
-          ? 'Inbox setup can be retried.'
-          : 'Creating your dedicated buyer inbox…'
+  const firstName =
+    profile.name?.trim().split(/\s+/)[0] ||
+    profile.email?.split('@')[0] ||
+    'there'
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl p-8">
@@ -68,67 +60,12 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
           <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
             COMPARI
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Your buyer workspace</h1>
+          <h1 className="mt-2 text-3xl font-bold">Welcome, {firstName}</h1>
         </div>
         <Button onClick={() => void signOut()} variant="outline">
           Sign out
         </Button>
       </header>
-      <section className="mt-8 grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 dark:text-slate-300">
-              {profile.name ?? profile.email ?? 'Private device workspace'}
-            </p>
-            {profile.email ? (
-              <p className="text-sm text-slate-500">{profile.email}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Buyer inbox</CardTitle>
-            <StatusBadge status={status} />
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 dark:text-slate-300">{inboxDetail}</p>
-            {profile.inboxProvisioningError ? (
-              <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                {profile.inboxProvisioningError}
-              </p>
-            ) : null}
-            {status === 'retryable_failure' ||
-            status === 'permanent_failure' ? (
-              <Button
-                className="mt-3"
-                disabled={isRetryingInbox}
-                onClick={() => {
-                  setRetryError(null)
-                  setIsRetryingInbox(true)
-                  void retryInbox({})
-                    .catch(() =>
-                      setRetryError(
-                        'Inbox retry failed. Please try again shortly.',
-                      ),
-                    )
-                    .finally(() => setIsRetryingInbox(false))
-                }}
-                variant="outline"
-              >
-                {isRetryingInbox
-                  ? 'Retrying inbox setup…'
-                  : 'Retry inbox setup'}
-              </Button>
-            ) : null}
-            {retryError ? (
-              <p className="mt-2 text-sm text-red-600">{retryError}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-      </section>
       <DemoModeBanner />
       <RequestWorkspace
         initialRequestId={firstRequestId}
@@ -154,6 +91,7 @@ function RequestWorkspace({
   const [prompt, setPrompt] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(
     initialRequestPrompt,
   )
@@ -173,6 +111,7 @@ function RequestWorkspace({
     try {
       const requestId = await create({ prompt: nextPrompt })
       setPrompt('')
+      setIsComposerOpen(false)
       setSelectedRequestId(requestId)
     } catch (reason) {
       setError(errorMessage(reason, 'Unable to create request.'))
@@ -205,34 +144,50 @@ function RequestWorkspace({
 
   return (
     <section className="mt-8 space-y-5 border-t border-slate-200 pt-8 dark:border-slate-800">
-      <div>
-        <h2 className="text-xl font-bold">Start a comparison</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Describe the outcome. Compari will interpret editable requirements and
-          only research within this request’s scope.
-        </p>
-      </div>
-      <form className="space-y-3" onSubmit={(event) => void submit(event)}>
-        <Label htmlFor="request-prompt">What are you looking for?</Label>
-        <Textarea
-          className="min-h-28"
-          id="request-prompt"
-          minLength={12}
-          onChange={(event) => setPrompt(event.target.value)}
-          placeholder={requestPromptPlaceholder}
-          required
-          value={prompt}
-        />
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-xl font-bold">Your requests</h2>
         <Button
-          disabled={isCreating || prompt.trim().length < 12}
-          type="submit"
+          onClick={() => {
+            setError(null)
+            setIsComposerOpen((current) => !current)
+          }}
+          size="sm"
         >
-          {isCreating ? 'Starting comparison…' : 'Start comparison'}
+          {isComposerOpen ? 'Close' : 'New request'}
         </Button>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      </form>
+      </div>
+      {isComposerOpen ? (
+        <form
+          className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+          onSubmit={(event) => void submit(event)}
+        >
+          <Label htmlFor="request-prompt">What are you looking for?</Label>
+          <Textarea
+            autoFocus
+            className="min-h-24"
+            id="request-prompt"
+            minLength={12}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder={requestPromptPlaceholder}
+            required
+            value={prompt}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Compari will ask for any details it needs next.
+            </p>
+            <Button
+              disabled={isCreating || prompt.trim().length < 12}
+              size="sm"
+              type="submit"
+            >
+              {isCreating ? 'Starting…' : 'Start comparison'}
+            </Button>
+          </div>
+        </form>
+      ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <div className="space-y-3">
-        <h3 className="font-semibold">Your requests</h3>
         {requests === undefined ? (
           <p className="text-sm text-slate-500">Loading requests…</p>
         ) : requests.page.length === 0 ? (
