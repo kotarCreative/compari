@@ -6,7 +6,11 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireCurrentUser, requireOwnedRequest } from './lib/auth'
-import { canResearch, transitionRequest } from './domain/workflowState'
+import {
+  buyerLocationQuestion,
+  canResearch,
+  transitionRequest,
+} from './domain/workflowState'
 import type { FunctionReference } from 'convex/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -88,7 +92,11 @@ const workflow = internal as unknown as {
 }
 
 export const create = mutation({
-  args: { prompt: v.string() },
+  args: {
+    prompt: v.string(),
+    location: v.optional(v.string()),
+    askForLocation: v.optional(v.boolean()),
+  },
   returns: v.id('procurementRequests'),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
@@ -99,11 +107,15 @@ export const create = mutation({
       throw new Error(
         'validation: describe the outcome in 12 to 8000 characters',
       )
+    const location = args.location?.trim()
+    if (location && location.length > 160)
+      throw new Error('validation: location is too long')
     const now = Date.now()
     const requestId = await ctx.db.insert('procurementRequests', {
       userId: user._id,
       prompt,
       title: 'New procurement request',
+      ...(location ? { location } : {}),
       status: 'draft',
       automationPaused: false,
       version: 1,
@@ -120,6 +132,16 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     })
+    if (args.askForLocation && !location)
+      await ctx.db.insert('questions', {
+        requestId,
+        text: buyerLocationQuestion,
+        importance: 'required',
+        status: 'open',
+        supportingFactIds: [],
+        createdAt: now,
+        updatedAt: now,
+      })
     const jobId = await ctx.db.insert('sideEffectJobs', {
       userId: user._id,
       kind: 'extract_requirements',

@@ -5,6 +5,7 @@ import { DemoModeBanner } from '../decision/DemoModeBanner'
 import { RequestDetail } from '../request/RequestDetail'
 import { pendingFirstRequestKey, requestPromptPlaceholder } from './constants'
 import { requestsApi } from './contracts'
+import { getRequestLocation } from './location'
 import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
@@ -109,7 +110,8 @@ function RequestWorkspace({
     setSubmittedPrompt(nextPrompt)
     setIsCreating(true)
     try {
-      const requestId = await create({ prompt: nextPrompt })
+      const requestLocation = await getRequestLocation()
+      const requestId = await create({ prompt: nextPrompt, ...requestLocation })
       setPrompt('')
       setIsComposerOpen(false)
       setSelectedRequestId(requestId)
@@ -174,7 +176,8 @@ function RequestWorkspace({
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              Compari will ask for any details it needs next.
+              Compari will ask for your approximate location and any other
+              details it needs next.
             </p>
             <Button
               disabled={isCreating || prompt.trim().length < 12}

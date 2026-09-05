@@ -84,7 +84,11 @@ class FirecrawlAdapter implements WebResearchPort {
         if (!row || typeof row !== 'object') return []
         const x = row as Record<string, unknown>
         const url = typeof x.url === 'string' ? x.url : ''
-        if (!url) return []
+        const title = typeof x.title === 'string' ? x.title : ''
+        const description =
+          typeof x.description === 'string' ? x.description : ''
+        if (!url || !isLikelyProviderSearchResult({ url, title, description }))
+          return []
         let hostname: string
         try {
           hostname = new URL(url).hostname
@@ -93,13 +97,9 @@ class FirecrawlAdapter implements WebResearchPort {
         }
         return [
           {
-            name:
-              typeof x.title === 'string' ? x.title.slice(0, 160) : hostname,
+            name: title ? title.slice(0, 160) : hostname,
             url,
-            snippet:
-              typeof x.description === 'string'
-                ? x.description.slice(0, 1_000)
-                : undefined,
+            snippet: description ? description.slice(0, 1_000) : undefined,
           },
         ]
       })
@@ -217,4 +217,51 @@ export function firecrawlSearchResults(payload: unknown): Array<unknown> {
   if (!data || typeof data !== 'object') return []
   const web = (data as { web?: unknown }).web
   return Array.isArray(web) ? web : []
+}
+
+const developerContentHosts = new Set([
+  'docs.python.org',
+  'gist.github.com',
+  'github.com',
+  'gitlab.com',
+  'npmjs.com',
+  'pypi.org',
+  'readthedocs.io',
+  'readthedocs.org',
+  'stackoverflow.com',
+])
+
+/** Discovery should yield businesses, not source code or package
+ * documentation that happens to share keywords with a buyer request. */
+export function isLikelyProviderSearchResult(input: {
+  url: string
+  title?: string
+  description?: string
+}): boolean {
+  let url: URL
+  try {
+    url = new URL(input.url)
+  } catch {
+    return false
+  }
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '')
+  if (
+    developerContentHosts.has(hostname) ||
+    hostname.endsWith('.readthedocs.io')
+  )
+    return false
+  let path = url.pathname.toLowerCase()
+  try {
+    path = decodeURIComponent(path)
+  } catch {
+    // The URL itself is valid; matching its encoded path is still safe.
+  }
+  if (
+    /\/(?:blob|tree)\//.test(path) ||
+    /(?:^|\/)(?:pyproject\.toml|requirements\.txt|setup\.py)$/.test(path) ||
+    /\.(?:cfg|ini|ipynb|lock|py|toml)$/.test(path)
+  )
+    return false
+  const label = `${input.title ?? ''} ${input.description ?? ''}`.toLowerCase()
+  return !/\bpython (?:config|configuration) file\b/.test(label)
 }

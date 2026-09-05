@@ -48,7 +48,7 @@ class OpenAIReasoningAdapter implements ReasoningPort {
       name: 'provider_search_plan',
       schema: providerSearchPlanSchema,
       system:
-        'Plan web research for a procurement request. Infer the buyer intent from the original prompt, extracted requirements, and answered questions; answers are authoritative. Return 2 to 4 concise, distinct search-engine queries that look for actual vendors capable of fulfilling the request, not pages that merely repeat the buyer message. Include the service or product category and relevant location or capability terms. Do not include sensitive personal details. Also return a concise vendorDetailQuery containing the capability, pricing, service-area, and contact terms that should be investigated on each vendor website. Do not include URLs or site: operators.',
+        'Plan web research for a procurement request. Infer the buyer intent from the original prompt, extracted requirements, and answered questions; answers are authoritative. Return 2 to 4 concise, distinct search-engine queries that look for actual businesses capable of fulfilling the request, not informational pages, source code, developer documentation, package registries, configuration files, or pages that merely repeat the buyer message. Include vendor, supplier, company, or service terms plus the relevant location or capability. Do not include sensitive personal details. Also return a concise vendorDetailQuery containing the capability, pricing, service-area, and contact terms that should be investigated on each vendor website. Do not include URLs or site: operators.',
       user: JSON.stringify(input).slice(0, 24_000),
     })
     const result = normalizeProviderSearchPlan(value)

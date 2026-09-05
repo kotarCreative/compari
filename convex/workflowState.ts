@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import {
+  buyerLocationQuestion,
   normalizeDomain,
   questionsAreSimilar,
   transitionCandidate,
@@ -326,6 +327,12 @@ export const completeIntake = internalMutation({
       leaseExpiresAt: undefined,
       updatedAt: now,
     })
+    const waitingForLocation = existingQuestions.some(
+      (question) =>
+        question.status === 'open' &&
+        questionsAreSimilar(question.text, buyerLocationQuestion),
+    )
+    if (waitingForLocation) return null
     if (request.status !== 'draft' && request.status !== 'researching')
       return null
     const discoveryJobId = await ctx.db.insert('sideEffectJobs', {

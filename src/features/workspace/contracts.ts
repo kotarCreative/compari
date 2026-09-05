@@ -53,7 +53,12 @@ export const usersApi = api as unknown as {
 
 export const requestsApi = api as unknown as {
   requests: {
-    create: FunctionReference<'mutation', 'public', { prompt: string }, string>
+    create: FunctionReference<
+      'mutation',
+      'public',
+      { prompt: string; location?: string; askForLocation?: boolean },
+      string
+    >
     list: FunctionReference<
       'query',
       'public',
