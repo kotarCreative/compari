@@ -3,11 +3,39 @@
 @layer base {
   html,
   body {
-    @apply text-gray-900 bg-gray-50 dark:bg-gray-950 dark:text-gray-200;
+    @apply text-slate-900 bg-[#f7f8f5] dark:bg-slate-950 dark:text-slate-200;
+    min-height: 100%;
+    background-image:
+      radial-gradient(
+        ellipse at 10% 0%,
+        rgb(186 230 253 / 0.3),
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at 95% 50%,
+        rgb(254 215 170 / 0.22),
+        transparent 45%
+      );
+    background-attachment: fixed;
   }
 
-  .using-mouse * {
-    outline: none !important;
+  ::selection {
+    background: #bae6fd;
+    color: #0c4a6e;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 3px solid #0284c7;
+    outline-offset: 4px;
+  }
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+  p {
+    overflow-wrap: anywhere;
   }
 }
 
@@ -88,5 +116,124 @@
   .animate-onboarding-pulse,
   .animate-onboarding-dot {
     animation: none;
+  }
+}
+
+@layer components {
+  .welcome-card {
+    @apply rounded-3xl border border-white/80 bg-white/80 p-6 shadow-xl shadow-slate-900/5 sm:p-10 dark:border-slate-800 dark:bg-slate-900/90;
+  }
+  .step-pill {
+    @apply rounded-full px-3 py-2;
+  }
+  .step-pill[data-active='true'] {
+    @apply bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200;
+  }
+  .suggestion-chip {
+    @apply rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-5 text-slate-600 transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+  .research-loader {
+    position: relative;
+    width: 144px;
+    height: 144px;
+    margin: 0 auto;
+  }
+  .research-orbit {
+    position: absolute;
+    inset: 12px;
+    border: 1px dashed #7dd3fc;
+    border-radius: 50%;
+    animation: onboarding-orbit 24s linear infinite;
+  }
+  .research-center {
+    position: absolute;
+    inset: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    background: #0369a1;
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 8px 28px #0284c733;
+    animation: research-breathe 3s ease-in-out infinite;
+  }
+  .research-tile {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 40px;
+    border: 1px solid #bae6fd;
+    border-radius: 10px;
+    color: #0369a1;
+    background: #f0f9ff;
+    box-shadow: 0 4px 10px #0c4a6e0d;
+    animation: research-float 3s ease-in-out infinite;
+  }
+  .research-tile-one {
+    top: 8px;
+    left: 25px;
+  }
+  .research-tile-two {
+    top: 46px;
+    right: 0;
+    animation-delay: -1s;
+  }
+  .research-tile-three {
+    bottom: 0;
+    left: 30px;
+    animation-delay: -2s;
+  }
+  .research-loader-compact {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .research-loader-compact .research-center {
+    inset: 4px;
+    border-radius: 12px;
+    font-size: 22px;
+  }
+  .research-loader-compact .research-tile,
+  .research-loader-compact .research-orbit {
+    display: none;
+  }
+  .skeleton {
+    background: linear-gradient(
+      100deg,
+      #cbd5e130 20%,
+      #bae6fd90 45%,
+      #cbd5e130 70%
+    );
+    background-size: 250% 100%;
+    animation: research-shimmer 2s ease-in-out infinite;
+  }
+  .loading-card {
+    animation: onboarding-welcome-up 400ms ease-out both;
+  }
+}
+@keyframes research-float {
+  50% {
+    transform: translateY(-7px) rotate(8deg);
+  }
+}
+@keyframes research-breathe {
+  50% {
+    transform: scale(1.08) rotate(-6deg);
+  }
+}
+@keyframes research-shimmer {
+  to {
+    background-position: -170% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

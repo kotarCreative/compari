@@ -5,6 +5,7 @@ import {
   vendorSearchProgressMessages,
 } from './OnboardingTransition'
 import type { FormEvent } from 'react'
+import { ResearchLoader } from '~/components/common/ResearchLoader'
 import { Button, Label, Textarea } from '~/components/ui'
 
 export function RequestConversation({
@@ -99,7 +100,8 @@ export function RequestConversation({
           </form>
         </div>
       ) : loaderPhase ? (
-        <div className="space-y-3">
+        <div className="animate-onboarding-welcome rounded-2xl border border-sky-100 bg-white/70 p-5 dark:border-slate-800 dark:bg-slate-900/70">
+          <ResearchLoader />
           <div
             aria-live="polite"
             className="space-y-1 pl-1 text-sm text-slate-600 dark:text-slate-300"
@@ -118,19 +120,9 @@ export function RequestConversation({
               }
             />
           </div>
-          <Label className="sr-only" htmlFor="request-conversation-answer">
-            Follow-up answer
-          </Label>
-          <Textarea
-            className="min-h-24"
-            disabled
-            id="request-conversation-answer"
-            placeholder={
-              loaderPhase === 'interpreting'
-                ? 'Any questions about your request will appear here…'
-                : 'Compari is searching with the details above…'
-            }
-          />
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            Your results and any follow-up questions will appear here.
+          </p>
         </div>
       ) : (
         <p

@@ -10,7 +10,7 @@ import {
 } from './constants'
 import { RequestConversation } from './RequestConversation'
 import type { FormEvent } from 'react'
-import { Input, Label, Textarea } from '~/components/ui'
+import { Button, Input, Label, Textarea } from '~/components/ui'
 
 export function FirstSearch() {
   const { signIn } = useAuthActions()
@@ -59,7 +59,7 @@ export function FirstSearch() {
 
   if (isStarting) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
+      <main className="welcome-shell mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-12">
         <p className="mb-10 text-sm font-semibold tracking-[0.22em] text-sky-600">
           COMPARI
         </p>
@@ -72,19 +72,35 @@ export function FirstSearch() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
+    <main className="welcome-shell mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-12">
       <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
         COMPARI
       </p>
+      <div
+        className="mt-8 flex items-center gap-3 text-xs font-medium text-slate-500"
+        aria-label={`Step ${step === 'name' ? '1' : '2'} of 2`}
+      >
+        <span className="step-pill" data-active={step === 'name'}>
+          01 · Meet your copilot
+        </span>
+        <span aria-hidden="true">→</span>
+        <span className="step-pill" data-active={step === 'request'}>
+          02 · Make a wish
+        </span>
+      </div>
       {step === 'name' ? (
-        <section className="mt-10 space-y-6">
+        <section className="welcome-card animate-onboarding-welcome mt-6 space-y-6">
           <div className="space-y-3">
             <h1 className="text-4xl font-bold tracking-tight">
-              Let’s start with your name.
+              Big decisions.
+              <br />
+              <span className="text-sky-700 dark:text-sky-300">
+                A little less work.
+              </span>
             </h1>
             <p className="max-w-xl text-slate-600 dark:text-slate-300">
-              Compari uses it for your buyer inbox and signs vendor outreach so
-              businesses know who they are responding to.
+              Meet your research copilot. Tell us what you need, and we’ll help
+              you find and compare the right vendors.
             </p>
           </div>
           <form className="space-y-3" onSubmit={acceptName}>
@@ -99,14 +115,24 @@ export function FirstSearch() {
               required
               value={fullName}
             />
-            <p className="text-xs text-slate-500">Press Enter to continue.</p>
+            <p className="text-xs leading-5 text-slate-500">
+              We use your name for your buyer inbox and to sign vendor outreach.
+            </p>
+            <Button className="w-full" size="lg" type="submit">
+              Let’s get started <span aria-hidden="true">→</span>
+            </Button>
             {error ? (
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p
+                role="alert"
+                className="text-sm text-red-600 dark:text-red-400"
+              >
+                {error}
+              </p>
             ) : null}
           </form>
         </section>
       ) : (
-        <section className="mt-10 space-y-8">
+        <section className="welcome-card mt-6 space-y-8">
           <div className="animate-onboarding-welcome space-y-2">
             <p className="text-sm text-slate-500">Nice to meet you.</p>
             <h1 className="text-4xl font-bold tracking-tight">
@@ -119,7 +145,7 @@ export function FirstSearch() {
           >
             <div className="space-y-3">
               <Label className="block" htmlFor="first-request-prompt">
-                What do you need to do?
+                What can we help you find?
               </Label>
               <Textarea
                 autoFocus
@@ -141,13 +167,49 @@ export function FirstSearch() {
                 value={prompt}
               />
             </div>
+            <div className="flex flex-wrap gap-2" aria-label="Example requests">
+              {[
+                'Find a wedding photographer in Calgary',
+                'Compare office cleaning services for a small team',
+                'Find a caterer for a 30-person birthday party',
+              ].map((example) => (
+                <button
+                  className="suggestion-chip"
+                  key={example}
+                  onClick={() => setPrompt(example)}
+                  type="button"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              disabled={prompt.trim().length < 12}
+              size="lg"
+              type="submit"
+            >
+              Find my options <span aria-hidden="true">↗</span>
+            </Button>
+            <button
+              className="text-sm text-slate-500 underline underline-offset-4"
+              onClick={() => setStep('name')}
+              type="button"
+            >
+              Edit your name
+            </button>
             <p className="text-xs text-slate-500">
               Press <kbd className="font-sans">⌘/Ctrl</kbd> +{' '}
               <kbd className="font-sans">Enter</kbd> to start searching for
               vendors.
             </p>
             {error ? (
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p
+                role="alert"
+                className="text-sm text-red-600 dark:text-red-400"
+              >
+                {error}
+              </p>
             ) : null}
           </form>
         </section>

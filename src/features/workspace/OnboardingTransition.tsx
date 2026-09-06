@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ResearchLoader } from '~/components/common/ResearchLoader'
 
 export const progressMessages = [
   'Saving your details securely.',
@@ -32,12 +33,16 @@ export function RotatingProgressText({
     setMessageIndex(0)
     const interval = window.setInterval(
       () => setMessageIndex((current) => (current + 1) % messages.length),
-      1_250,
+      4_000,
     )
     return () => window.clearInterval(interval)
   }, [messages])
 
-  return <p className="min-h-6">{messages[messageIndex]}</p>
+  return (
+    <p key={messageIndex} className="animate-onboarding-welcome min-h-6">
+      {messages[messageIndex]}
+    </p>
+  )
 }
 
 export function OnboardingTransition({
@@ -49,13 +54,7 @@ export function OnboardingTransition({
 }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-8 text-center">
-      <div
-        aria-hidden="true"
-        className="relative mb-8 flex h-20 w-20 items-center justify-center"
-      >
-        <span className="animate-onboarding-orbit absolute inset-0 rounded-full border-2 border-sky-200 border-t-sky-600 dark:border-sky-900 dark:border-t-sky-400" />
-        <span className="animate-onboarding-pulse h-10 w-10 rounded-full bg-sky-100 dark:bg-sky-950" />
-      </div>
+      <ResearchLoader />
       <div aria-live="polite" role="status">
         <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
           COMPARI

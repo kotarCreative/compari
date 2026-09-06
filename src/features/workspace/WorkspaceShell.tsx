@@ -9,6 +9,7 @@ import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
 import type { FormEvent } from 'react'
+import { LoadingCards } from '~/components/common/ResearchLoader'
 import { errorMessage } from '~/lib/errors'
 import {
   Button,
@@ -35,7 +36,12 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
     setPendingFirstPrompt(window.sessionStorage.getItem(pendingFirstRequestKey))
   }, [])
 
-  if (pendingFirstPrompt === undefined) return null
+  if (pendingFirstPrompt === undefined)
+    return (
+      <main className="mx-auto max-w-4xl px-6 py-12">
+        <LoadingCards />
+      </main>
+    )
   if (pendingFirstPrompt)
     return (
       <FirstRequestOnboarding
@@ -54,13 +60,19 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
     'there'
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl p-8">
+    <main className="mx-auto min-h-screen max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-6 dark:border-slate-800">
         <div>
           <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
             COMPARI
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Welcome, {firstName}</h1>
+          <h1 className="mt-2 text-3xl font-bold">
+            Welcome, {firstName}
+            <span className="text-sky-600">.</span>
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            A little clarity for your next big decision.
+          </p>
         </div>
         <Button onClick={() => void signOut()} variant="outline">
           Sign out
@@ -189,15 +201,30 @@ function RequestWorkspace({
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <div className="space-y-3">
         {requests === undefined ? (
-          <p className="text-sm text-slate-500">Loading requests…</p>
+          <LoadingCards />
         ) : requests.page.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Your requests will appear here.
-          </p>
+          <div className="welcome-card py-12 text-center">
+            <span
+              aria-hidden="true"
+              className="mb-4 inline-grid size-14 place-items-center rounded-2xl bg-sky-100 text-2xl text-sky-700"
+            >
+              ✦
+            </span>
+            <h3 className="text-xl font-semibold">
+              Your next great find starts here.
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+              Tell us what you’re looking for. We’ll help turn a long list of
+              possibilities into a clearer choice.
+            </p>
+            <Button className="mt-6" onClick={() => setIsComposerOpen(true)}>
+              Create your first request <span aria-hidden="true">→</span>
+            </Button>
+          </div>
         ) : (
           requests.page.map((request) => (
             <Card className="transition hover:border-sky-300" key={request._id}>
-              <CardHeader className="flex-row items-start justify-between space-y-0">
+              <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
                 <div>
                   <CardTitle>{request.title}</CardTitle>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
