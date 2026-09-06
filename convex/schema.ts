@@ -50,6 +50,7 @@ export default defineSchema({
     emailVerificationTime: v.optional(v.number()),
     phone: v.optional(v.string()),
     phoneVerificationTime: v.optional(v.number()),
+    location: v.optional(v.string()),
     isAnonymous: v.optional(v.boolean()),
     tokenIdentifier: v.optional(v.string()),
     nameConfirmedAt: v.optional(v.number()),

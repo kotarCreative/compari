@@ -7,6 +7,7 @@ import { pendingFirstRequestKey, requestPromptPlaceholder } from './constants'
 import { requestsApi } from './contracts'
 import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import { RequestConversation } from './RequestConversation'
+import { LocationPill } from './LocationPill'
 import type { Profile } from './contracts'
 import type { FormEvent } from 'react'
 import { LoadingCards } from '~/components/common/ResearchLoader'
@@ -50,6 +51,7 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
           setFirstRequestPrompt(pendingFirstPrompt)
           setPendingFirstPrompt(null)
         }}
+        location={profile.location}
         prompt={pendingFirstPrompt}
       />
     )
@@ -82,6 +84,7 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
       <RequestWorkspace
         initialRequestId={firstRequestId}
         initialRequestPrompt={firstRequestPrompt}
+        location={profile.location}
       />
     </main>
   )
@@ -90,9 +93,11 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
 function RequestWorkspace({
   initialRequestId,
   initialRequestPrompt,
+  location,
 }: {
   initialRequestId: string | null
   initialRequestPrompt: string | null
+  location?: string
 }) {
   const create = useMutation(requestsApi.requests.create)
   const pause = useMutation(requestsApi.requests.pauseAutomation)
@@ -121,7 +126,10 @@ function RequestWorkspace({
     setSubmittedPrompt(nextPrompt)
     setIsCreating(true)
     try {
-      const requestId = await create({ prompt: nextPrompt })
+      const requestId = await create({
+        prompt: nextPrompt,
+        ...(location ? { location } : {}),
+      })
       setPrompt('')
       setIsComposerOpen(false)
       setSelectedRequestId(requestId)
@@ -184,6 +192,7 @@ function RequestWorkspace({
             required
             value={prompt}
           />
+          <LocationPill location={location} />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
               Compari will ask for any details it needs next.

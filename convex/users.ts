@@ -26,6 +26,7 @@ const profileValidator = v.union(
     _id: v.id('users'),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
+    location: v.optional(v.string()),
     agentEmailAddress: v.optional(v.string()),
     inboxProvisioningStatus: v.optional(
       v.union(
@@ -59,6 +60,7 @@ export const current = query({
       _id: user._id,
       name: user.name,
       email: user.email,
+      location: user.location,
       agentEmailAddress: user.agentEmailAddress,
       inboxProvisioningStatus: user.inboxProvisioningStatus,
       inboxProvisioningError: user.inboxProvisioningError,
@@ -165,6 +167,24 @@ export const completeMyProfile = mutation({
       agentMailInternal.agentMail.provisionUserInbox,
       { userId: user._id, jobId },
     )
+    return null
+  },
+})
+
+export const setMyLocation = mutation({
+  args: { location: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx)
+    const location = args.location.trim().replace(/\s+/g, ' ')
+    if (location.length < 2 || location.length > 160)
+      throw new Error(
+        'validation: enter a location between 2 and 160 characters',
+      )
+    await ctx.db.patch('users', user._id, {
+      location,
+      updatedAt: Date.now(),
+    })
     return null
   },
 })

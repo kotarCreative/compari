@@ -251,6 +251,13 @@ export const completeIntake = internalMutation({
     )
       return null
     const now = Date.now()
+    const interpretedLocation = args.output.location?.trim().slice(0, 160)
+    const profile = await ctx.db.get('users', request.userId)
+    if (profile && interpretedLocation && !profile.location)
+      await ctx.db.patch('users', profile._id, {
+        location: interpretedLocation,
+        updatedAt: now,
+      })
     const outputRequirements = args.output.requirements.slice(0, 20)
     const existingRequirements = await ctx.db
       .query('requirements')
@@ -342,7 +349,7 @@ export const completeIntake = internalMutation({
     if (request.status === 'draft') transitionRequest('draft', 'researching')
     await ctx.db.patch('procurementRequests', request._id, {
       title: args.output.title.trim().slice(0, 120) || 'Procurement request',
-      location: args.output.location?.trim().slice(0, 160) || request.location,
+      location: interpretedLocation || request.location,
       status: request.status === 'draft' ? 'researching' : request.status,
       interpretedVersion: request.version,
       researchStatus: waitingForBuyer

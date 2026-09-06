@@ -108,7 +108,7 @@ export const create = mutation({
       throw new Error(
         'validation: describe the outcome in 12 to 8000 characters',
       )
-    const location = args.location?.trim()
+    const location = args.location?.trim() || user.location
     if (location && location.length > 160)
       throw new Error('validation: location is too long')
     const now = Date.now()

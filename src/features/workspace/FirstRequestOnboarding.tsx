@@ -10,9 +10,11 @@ import { errorMessage } from '~/lib/errors'
 export function FirstRequestOnboarding({
   prompt,
   onComplete,
+  location,
 }: {
   prompt: string
   onComplete: (requestId: string) => void
+  location?: string
 }) {
   const create = useMutation(requestsApi.requests.create)
   const answerQuestion = useMutation(productApi.questions.answerForRequest)
@@ -65,7 +67,10 @@ export function FirstRequestOnboarding({
     if (pendingRequestId || isCreating.current) return
     isCreating.current = true
     setError(null)
-    void create({ prompt })
+    void create({
+      prompt,
+      ...(location ? { location } : {}),
+    })
       .then((createdRequestId) => {
         window.sessionStorage.setItem(
           pendingFirstRequestIdKey,
@@ -77,7 +82,7 @@ export function FirstRequestOnboarding({
         setError(errorMessage(reason, 'Unable to create your first request.'))
         isCreating.current = false
       })
-  }, [create, createAttempt, pendingRequestId, prompt])
+  }, [create, createAttempt, location, pendingRequestId, prompt])
 
   useEffect(() => {
     setAnswerDraft('')
@@ -158,6 +163,8 @@ export function FirstRequestOnboarding({
         }}
         prompt={detail?.request.prompt ?? prompt}
         question={firstOpenQuestion}
+        canEditLocation
+        location={location}
       />
       {error && !requestId ? (
         <Button

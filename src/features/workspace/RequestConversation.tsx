@@ -4,6 +4,7 @@ import {
   interpretationProgressMessages,
   vendorSearchProgressMessages,
 } from './OnboardingTransition'
+import { LocationPill } from './LocationPill'
 import type { FormEvent } from 'react'
 import { ResearchLoader } from '~/components/common/ResearchLoader'
 import { Button, Label, Textarea } from '~/components/ui'
@@ -18,6 +19,8 @@ export function RequestConversation({
   loaderPhase,
   onAnswerChange,
   onAnswerSubmit,
+  location,
+  canEditLocation = false,
 }: {
   prompt: string
   history?: Array<{
@@ -33,6 +36,8 @@ export function RequestConversation({
   loaderPhase?: 'interpreting' | 'vendors'
   onAnswerChange?: (value: string) => void
   onAnswerSubmit?: (event: FormEvent<HTMLFormElement>) => void
+  location?: string
+  canEditLocation?: boolean
 }) {
   const answerInput = useRef<HTMLTextAreaElement>(null)
 
@@ -133,6 +138,8 @@ export function RequestConversation({
           Thanks — Compari is continuing the vendor search with these details.
         </p>
       )}
+
+      {canEditLocation ? <LocationPill location={location} /> : null}
 
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">

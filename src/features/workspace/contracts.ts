@@ -4,6 +4,7 @@ import type { FunctionReference } from 'convex/server'
 export type Profile = {
   name?: string
   email?: string
+  location?: string
   agentEmailAddress?: string
   inboxProvisioningStatus?:
     | 'pending'
@@ -39,6 +40,12 @@ export const usersApi = api as unknown as {
       'mutation',
       'public',
       { firstName: string; lastName: string },
+      null
+    >
+    setMyLocation: FunctionReference<
+      'mutation',
+      'public',
+      { location: string },
       null
     >
     current: FunctionReference<'query', 'public', NoArgs, Profile | null>
