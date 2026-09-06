@@ -8,7 +8,7 @@ export function ResearchLoader({ compact = false }: { compact?: boolean }) {
       <span className="research-tile research-tile-one">✓</span>
       <span className="research-tile research-tile-two">≋</span>
       <span className="research-tile research-tile-three">✦</span>
-      <span className="research-center">✦</span>
+      <span className="research-center">☺</span>
     </div>
   )
 }

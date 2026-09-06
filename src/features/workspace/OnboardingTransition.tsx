@@ -56,9 +56,7 @@ export function OnboardingTransition({
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-8 text-center">
       <ResearchLoader />
       <div aria-live="polite" role="status">
-        <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
-          COMPARI
-        </p>
+        <p className="brand-wordmark">compari</p>
         <h1 className="mt-4 text-3xl font-bold tracking-tight">
           {firstName ? `${title}, ${firstName}` : title}
         </h1>

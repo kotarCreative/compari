@@ -10,6 +10,7 @@ import { RequestConversation } from './RequestConversation'
 import { LocationPill } from './LocationPill'
 import type { Profile } from './contracts'
 import type { FormEvent } from 'react'
+import { NotebookPal } from '~/components/common/NotebookPal'
 import { LoadingCards } from '~/components/common/ResearchLoader'
 import { errorMessage } from '~/lib/errors'
 import {
@@ -65,9 +66,7 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
     <main className="mx-auto min-h-screen max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-6 dark:border-slate-800">
         <div>
-          <p className="text-sm font-semibold tracking-[0.22em] text-sky-600">
-            COMPARI
-          </p>
+          <p className="brand-wordmark">compari</p>
           <h1 className="mt-2 text-3xl font-bold">
             Welcome, {firstName}
             <span className="text-sky-600">.</span>
@@ -213,12 +212,7 @@ function RequestWorkspace({
           <LoadingCards />
         ) : requests.page.length === 0 ? (
           <div className="welcome-card py-12 text-center">
-            <span
-              aria-hidden="true"
-              className="mb-4 inline-grid size-14 place-items-center rounded-2xl bg-sky-100 text-2xl text-sky-700"
-            >
-              ✦
-            </span>
+            <NotebookPal className="mx-auto mb-4 w-28 text-slate-800" />
             <h3 className="text-xl font-semibold">
               Your next great find starts here.
             </h3>

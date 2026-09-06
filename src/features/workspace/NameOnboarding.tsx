@@ -97,9 +97,7 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
     if (pendingPrompt)
       return (
         <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
-          <p className="mb-10 text-sm font-semibold tracking-[0.22em] text-sky-600">
-            COMPARI
-          </p>
+          <p className="mb-10 brand-wordmark">compari</p>
           <RequestConversation
             loaderPhase="interpreting"
             prompt={pendingPrompt}

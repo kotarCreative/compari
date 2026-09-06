@@ -114,9 +114,7 @@ export function FirstRequestOnboarding({
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-8 py-12 md:py-20">
-      <p className="mb-10 text-sm font-semibold tracking-[0.22em] text-sky-600">
-        COMPARI
-      </p>
+      <p className="mb-10 brand-wordmark">compari</p>
       <RequestConversation
         answer={answerDraft}
         error={

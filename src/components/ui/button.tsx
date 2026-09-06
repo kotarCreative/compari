@@ -7,11 +7,11 @@ type ButtonSize = 'default' | 'sm' | 'lg' | 'icon'
 
 const variants: Record<ButtonVariant, string> = {
   default:
-    'bg-sky-700 text-white shadow-sm shadow-sky-900/15 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300',
+    'border-2 border-slate-800 bg-sky-200 text-slate-950 shadow-[3px_3px_0_var(--color-slate-800)] hover:bg-sky-300',
   destructive:
     'bg-red-600 text-white shadow-sm hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600',
   outline:
-    'border border-slate-300 bg-transparent hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800',
+    'border-2 border-slate-700 bg-white/60 shadow-[2px_2px_0_var(--color-slate-200)] hover:bg-slate-100',
   secondary:
     'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   ghost: 'hover:bg-slate-100 dark:hover:bg-slate-800',
