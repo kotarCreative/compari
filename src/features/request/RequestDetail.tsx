@@ -20,6 +20,7 @@ export function RequestDetail({
   const pause = useMutation(productApi.requests.pauseAutomation)
   const resume = useMutation(productApi.requests.resumeAutomation)
   const cancel = useMutation(productApi.requests.cancel)
+  const retryFailed = useMutation(productApi.outreach.retryFailed)
   const answerQuestion = useMutation(productApi.questions.answerForRequest)
   const selectCandidates = useMutation(productApi.outreach.selectCandidates)
   const [answerDraft, setAnswerDraft] = useState('')
@@ -134,6 +135,7 @@ export function RequestDetail({
           <Options
             detail={detail}
             onError={setError}
+            retryFailed={retryFailed}
             selectCandidates={selectCandidates}
           />
           <DecisionPanel
@@ -238,10 +240,12 @@ function AgentProgress({ detail }: { detail: Detail }) {
 function Options({
   detail,
   onError,
+  retryFailed,
   selectCandidates,
 }: {
   detail: Detail
   onError: (value: string | null) => void
+  retryFailed: (args: { attemptId: string }) => Promise<unknown>
   selectCandidates: (args: {
     requestId: string
     candidateIds: Array<string>
@@ -249,6 +253,9 @@ function Options({
 }) {
   const [selected, setSelected] = useState<Array<string>>([])
   const [isContacting, setIsContacting] = useState(false)
+  const [retryingAttemptId, setRetryingAttemptId] = useState<string | null>(
+    null,
+  )
   const options = detail.candidates.filter(
     (candidate) =>
       candidate.recommendationStatus === 'recommended' ||
@@ -380,6 +387,61 @@ function Options({
           >
             {isContacting ? 'Starting contact…' : 'Contact selected'}
           </Button>
+        </div>
+      ) : null}
+
+      {detail.outreach.length ? (
+        <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+          <h4 className="text-sm font-semibold">Outreach status</h4>
+          {detail.outreach.map((attempt) => {
+            const candidate = detail.candidates.find(
+              (item) => item._id === attempt.candidateId,
+            )
+            const isRetryable =
+              attempt.status === 'retryable_failure' ||
+              (attempt.status === 'needs_user' &&
+                attempt.safeError?.includes('Idempotency-Key') === true &&
+                attempt.safeError.includes('invalid_format'))
+            return (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                key={attempt._id}
+              >
+                <div>
+                  <p className="font-medium">
+                    {candidate?.name ?? 'Provider'} · {attempt.status}
+                  </p>
+                  {attempt.safeError ? (
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      {attempt.safeError}
+                    </p>
+                  ) : null}
+                </div>
+                {isRetryable ? (
+                  <Button
+                    disabled={retryingAttemptId === attempt._id}
+                    onClick={() => {
+                      onError(null)
+                      setRetryingAttemptId(attempt._id)
+                      void retryFailed({ attemptId: attempt._id })
+                        .catch((reason) =>
+                          onError(
+                            errorMessage(reason, 'Could not retry outreach.'),
+                          ),
+                        )
+                        .finally(() => setRetryingAttemptId(null))
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {retryingAttemptId === attempt._id
+                      ? 'Retrying…'
+                      : 'Retry contact'}
+                  </Button>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       ) : null}
     </section>

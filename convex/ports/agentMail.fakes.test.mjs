@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AgentMailSdkAdapter } from '../adapters/agentMail.ts'
+import {
+  AgentMailSdkAdapter,
+  toAgentMailIdempotencyKey,
+} from '../adapters/agentMail.ts'
 import { safeExternalError } from '../domain/inboxProvisioning.ts'
 
 class FakeAgentMailPort {
@@ -148,6 +151,13 @@ test('official AgentMail adapter maps inbox and idempotent message contracts', a
     { idempotencyKey: 'reply-v1' },
   ])
   assert.deepEqual(calls[4], ['get', 'inbox_1', 'msg_3'])
+})
+
+test('AgentMail send keys contain only characters accepted by the API', () => {
+  assert.equal(
+    toAgentMailIdempotencyKey('buyer-selected-outreach:candidate:v2'),
+    'buyer-selected-outreach-candidate-v2',
+  )
 })
 
 test('official AgentMail adapter retries a taken username deterministically', async () => {

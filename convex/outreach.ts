@@ -240,7 +240,14 @@ export const retryFailed = mutation({
     const attempt = await ctx.db.get('outreachAttempts', args.attemptId)
     if (!attempt) throw new Error('validation: outreach attempt does not exist')
     await requireOwnedRequest(ctx, attempt.requestId)
-    if (attempt.status !== 'retryable_failure')
+    const recoverableAgentMailKeyFailure =
+      attempt.status === 'needs_user' &&
+      attempt.safeError?.includes('Idempotency-Key') === true &&
+      attempt.safeError.includes('invalid_format')
+    if (
+      attempt.status !== 'retryable_failure' &&
+      !recoverableAgentMailKeyFailure
+    )
       throw new Error('validation: only retryable failures can be retried')
     const job = await ctx.db.get('sideEffectJobs', attempt.jobId)
     if (!job) throw new Error('invariant: outreach job is missing')

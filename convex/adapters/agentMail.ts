@@ -140,7 +140,7 @@ export class AgentMailSdkAdapter implements AgentMailPort {
     const sent = await this.client().inboxes.messages.send(
       input.inboxId,
       { to: [input.to], subject: input.subject, text: input.text },
-      { idempotencyKey: input.idempotencyKey },
+      { idempotencyKey: toAgentMailIdempotencyKey(input.idempotencyKey) },
     )
     return { messageId: sent.messageId, threadId: sent.threadId }
   }
@@ -155,7 +155,7 @@ export class AgentMailSdkAdapter implements AgentMailPort {
       input.inboxId,
       input.parentMessageId,
       { text: input.text },
-      { idempotencyKey: input.idempotencyKey },
+      { idempotencyKey: toAgentMailIdempotencyKey(input.idempotencyKey) },
     )
     return { messageId: sent.messageId, threadId: sent.threadId }
   }
@@ -191,6 +191,11 @@ export class AgentMailSdkAdapter implements AgentMailPort {
         })),
     }
   }
+}
+
+/** AgentMail accepts only RFC 3986 unreserved characters in send keys. */
+export function toAgentMailIdempotencyKey(value: string): string {
+  return value.replace(/[^A-Za-z0-9._~-]/g, '-')
 }
 
 function stableId(value: string) {
