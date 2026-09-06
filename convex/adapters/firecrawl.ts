@@ -3,6 +3,7 @@ import {
   isDemoMode,
   isRetryableHttpStatus,
   requireDeploymentEnv,
+  retryAfterDelayMs,
 } from './runtime.ts'
 import type {
   ProviderSearchResult,
@@ -11,6 +12,37 @@ import type {
 } from '../ports/webResearch'
 
 let port: WebResearchPort | undefined
+
+class RetryableFirecrawlError extends Error {
+  readonly retryAfterMs?: number
+
+  constructor(
+    message: string,
+    retryAfterHeader: string | null,
+    fallbackDelayMs?: number,
+  ) {
+    super(`retryable_external: ${message}`)
+    this.retryAfterMs = retryAfterDelayMs(retryAfterHeader) ?? fallbackDelayMs
+  }
+}
+
+function firecrawlHttpError(response: Response, operation: string): Error {
+  if (response.status === 429)
+    return new RetryableFirecrawlError(
+      `Firecrawl ${operation} rate limit reached`,
+      response.headers.get('Retry-After'),
+      60_000,
+    )
+  if (isRetryableHttpStatus(response.status))
+    return new RetryableFirecrawlError(
+      `Firecrawl ${operation} is temporarily unavailable (${response.status})`,
+      response.headers.get('Retry-After'),
+    )
+  return new Error(
+    `permanent_external: Firecrawl ${operation} failed (${response.status})`,
+  )
+}
+
 export function getWebResearchPort(): WebResearchPort {
   port ??= isDemoMode() ? new DemoWebResearchAdapter() : new FirecrawlAdapter()
   return port
@@ -73,12 +105,7 @@ class FirecrawlAdapter implements WebResearchPort {
       throw new Error('retryable_external: Firecrawl discovery is unreachable')
     }
     const payload: unknown = await response.json().catch(() => null)
-    if (!response.ok)
-      throw new Error(
-        isRetryableHttpStatus(response.status)
-          ? 'retryable_external: Firecrawl discovery is temporarily unavailable'
-          : `permanent_external: Firecrawl search failed (${response.status})`,
-      )
+    if (!response.ok) throw firecrawlHttpError(response, 'discovery')
     return firecrawlSearchResults(payload)
       .flatMap((row): Array<ProviderSearchResult> => {
         if (!row || typeof row !== 'object') return []
@@ -111,34 +138,7 @@ class FirecrawlAdapter implements WebResearchPort {
     limit: number
   }): Promise<Array<ResearchPage>> {
     const baseUrl = new URL(input.url)
-    const normalizedHost = baseUrl.hostname.replace(/^www\./, '').toLowerCase()
-    let discoveredUrls: Array<string> = []
-    if (input.limit > 1) {
-      try {
-        const detailResults = await this.searchProviders({
-          query: `site:${baseUrl.hostname} ${input.query}`.slice(0, 500),
-          limit: Math.min(input.limit - 1, 4),
-        })
-        discoveredUrls = detailResults.flatMap((result) => {
-          try {
-            const url = new URL(result.url)
-            return url.hostname.replace(/^www\./, '').toLowerCase() ===
-              normalizedHost
-              ? [url.toString()]
-              : []
-          } catch {
-            return []
-          }
-        })
-      } catch {
-        // Vendor-site discovery is an enhancement; the known page can still
-        // provide useful evidence when Firecrawl search is temporarily sparse.
-      }
-    }
-    const urls = [...new Set([baseUrl.toString(), ...discoveredUrls])].slice(
-      0,
-      input.limit,
-    )
+    const urls = [baseUrl.toString()]
     const attempts = await Promise.allSettled(
       urls.map((url) => this.scrapePage(url)),
     )
@@ -173,12 +173,7 @@ class FirecrawlAdapter implements WebResearchPort {
       throw new Error('retryable_external: Firecrawl research is unreachable')
     }
     const payload: unknown = await response.json().catch(() => null)
-    if (!response.ok)
-      throw new Error(
-        isRetryableHttpStatus(response.status)
-          ? 'retryable_external: Firecrawl research is temporarily unavailable'
-          : `permanent_external: Firecrawl scrape failed (${response.status})`,
-      )
+    if (!response.ok) throw firecrawlHttpError(response, 'research')
     const data =
       payload && typeof payload === 'object'
         ? (payload as { data?: unknown }).data

@@ -10,6 +10,7 @@ import {
 } from './domain/workflowState'
 import { extractPublicEndpoints } from './domain/researchEndpoints'
 import { rankingSettlement } from './domain/ranking'
+import { candidateResearchDelayMs } from './domain/sideEffectPolicy'
 import type { MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 
@@ -307,14 +308,24 @@ export const completeIntake = internalMutation({
         knownQuestionTexts.push(text)
       }
     }
+    const openIntakeQuestions = await ctx.db
+      .query('questions')
+      .withIndex('by_request_id_and_status', (q) =>
+        q.eq('requestId', request._id).eq('status', 'open'),
+      )
+      .take(100)
+    const waitingForBuyer = openIntakeQuestions.some(
+      (question) => question.candidateId === undefined,
+    )
     if (request.status === 'draft') transitionRequest('draft', 'researching')
     await ctx.db.patch('procurementRequests', request._id, {
       title: args.output.title.trim().slice(0, 120) || 'Procurement request',
       location: args.output.location?.trim().slice(0, 160) || request.location,
       status: request.status === 'draft' ? 'researching' : request.status,
       interpretedVersion: request.version,
-      researchStatus:
-        request.status === 'draft' || request.status === 'researching'
+      researchStatus: waitingForBuyer
+        ? 'not_started'
+        : request.status === 'draft' || request.status === 'researching'
           ? 'in_progress'
           : request.researchStatus,
       updatedAt: now,
@@ -326,6 +337,16 @@ export const completeIntake = internalMutation({
       leaseExpiresAt: undefined,
       updatedAt: now,
     })
+    if (waitingForBuyer) {
+      await ctx.db.insert('activityEvents', {
+        requestId: request._id,
+        eventType: 'requirements_interpreted',
+        safeMessage: 'Requirements interpreted; waiting for buyer details.',
+        correlationId: String(job._id),
+        createdAt: now,
+      })
+      return null
+    }
     if (request.status !== 'draft' && request.status !== 'researching')
       return null
     const discoveryJobId = await ctx.db.insert('sideEffectJobs', {
@@ -386,7 +407,9 @@ export const recordDiscovery = internalMutation({
       return null
     const now = Date.now()
     let discovered = 0
+    let refreshed = 0
     let usableProviders = 0
+    let candidateCounts = request.candidateCounts
     const scheduled: Array<{
       candidateId: Id<'requestCandidates'>
       jobId: Id<'sideEffectJobs'>
@@ -430,10 +453,14 @@ export const recordDiscovery = internalMutation({
           createdAt: now,
           updatedAt: now,
         })
+        candidateCounts = {
+          ...candidateCounts,
+          discovered: candidateCounts.discovered + 1,
+        }
         const researchJobId = await ctx.db.insert('sideEffectJobs', {
           userId: request.userId,
           kind: 'research_candidate',
-          idempotencyKey: `research:${candidateId}:v1`,
+          idempotencyKey: `research:${candidateId}:v${request.version}`,
           status: 'pending',
           attemptCount: 0,
           maxAttempts: 3,
@@ -446,6 +473,50 @@ export const recordDiscovery = internalMutation({
         })
         scheduled.push({ candidateId, jobId: researchJobId })
         discovered++
+      } else if (
+        candidate.inputVersion !== request.version &&
+        (candidate.status === 'discovered' ||
+          candidate.status === 'qualified' ||
+          candidate.status === 'rejected')
+      ) {
+        if (candidate.status !== 'discovered')
+          candidateCounts = {
+            ...candidateCounts,
+            [candidate.status]: Math.max(
+              0,
+              candidateCounts[candidate.status] - 1,
+            ),
+            discovered: candidateCounts.discovered + 1,
+          }
+        await ctx.db.patch('requestCandidates', candidate._id, {
+          status: 'discovered',
+          inputVersion: request.version,
+          qualificationSummary: undefined,
+          rejectionSummary: undefined,
+          recommendationStatus: undefined,
+          recommendationScore: undefined,
+          recommendationReason: undefined,
+          recommendationCaveats: undefined,
+          recommendationVersion: undefined,
+          version: candidate.version + 1,
+          updatedAt: now,
+        })
+        const researchJobId = await ctx.db.insert('sideEffectJobs', {
+          userId: request.userId,
+          kind: 'research_candidate',
+          idempotencyKey: `research:${candidate._id}:v${request.version}`,
+          status: 'pending',
+          attemptCount: 0,
+          maxAttempts: 3,
+          requestId: request._id,
+          candidateId: candidate._id,
+          inputVersion: request.version,
+          scheduledAt: now,
+          createdAt: now,
+          updatedAt: now,
+        })
+        scheduled.push({ candidateId: candidate._id, jobId: researchJobId })
+        refreshed++
       }
     }
     await ctx.db.patch('sideEffectJobs', job._id, {
@@ -460,15 +531,12 @@ export const recordDiscovery = internalMutation({
       searchQueries: args.searchQueries.slice(0, 4),
       vendorDetailQuery: args.vendorDetailQuery.slice(0, 240),
       searchPlanVersion: request.version,
-      candidateCounts: {
-        ...request.candidateCounts,
-        discovered: request.candidateCounts.discovered + discovered,
-      },
+      candidateCounts,
       updatedAt: now,
     })
-    for (const next of scheduled)
+    for (const [index, next] of scheduled.entries())
       await ctx.scheduler.runAfter(
-        0,
+        candidateResearchDelayMs(index),
         internal.workflows.researchCandidate,
         next,
       )
@@ -481,7 +549,7 @@ export const recordDiscovery = internalMutation({
       requestId: request._id,
       eventType: usableProviders ? 'providers_discovered' : 'research_empty',
       safeMessage: usableProviders
-        ? `${usableProviders} providers matched this request; ${discovered} were newly discovered.`
+        ? `${usableProviders} providers matched this request; ${discovered} were new and ${refreshed} were refreshed with the latest answers.`
         : 'No providers were discovered. Update the request and retry research.',
       correlationId: String(job._id),
       createdAt: now,
@@ -491,6 +559,57 @@ export const recordDiscovery = internalMutation({
         requestId: request._id,
         jobId: rankingJobId,
       })
+    return null
+  },
+})
+export const failDiscovery = internalMutation({
+  args: {
+    requestId: v.id('procurementRequests'),
+    jobId: v.id('sideEffectJobs'),
+    claimToken: v.string(),
+    retryable: v.boolean(),
+    retryAfterMs: v.optional(v.number()),
+    summary: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const request = await ctx.db.get('procurementRequests', args.requestId)
+    const job = await ctx.db.get('sideEffectJobs', args.jobId)
+    if (
+      !request ||
+      !job ||
+      job.requestId !== request._id ||
+      job.inputVersion !== request.version ||
+      job.status !== 'running' ||
+      job.claimToken !== args.claimToken
+    )
+      return null
+    const retry = await ctx.runMutation(internal.sideEffectJobs.retryOrFail, {
+      jobId: job._id,
+      claimToken: args.claimToken,
+      retryable: args.retryable,
+      retryAfterMs: args.retryAfterMs,
+      summary: args.summary.slice(0, 300),
+    })
+    if (retry) {
+      await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, {
+        jobId: job._id,
+        retryAt: retry.retryAt,
+      })
+      return null
+    }
+    const now = Date.now()
+    await ctx.db.patch('procurementRequests', request._id, {
+      researchStatus: 'empty',
+      updatedAt: now,
+    })
+    await ctx.db.insert('activityEvents', {
+      requestId: request._id,
+      eventType: 'research_blocked',
+      safeMessage: args.summary.slice(0, 300),
+      correlationId: String(job._id),
+      createdAt: now,
+    })
     return null
   },
 })
@@ -511,6 +630,7 @@ export const loadCandidateForJob = internalQuery({
       !candidate ||
       !job ||
       job.candidateId !== candidate._id ||
+      job.inputVersion !== candidate.inputVersion ||
       job.status !== 'running' ||
       job.claimToken !== args.claimToken
     )
@@ -556,6 +676,7 @@ export const recordCandidateResearch = internalMutation({
       !candidate ||
       !job ||
       job.candidateId !== candidate._id ||
+      job.inputVersion !== candidate.inputVersion ||
       job.status !== 'running' ||
       job.claimToken !== args.claimToken
     )
@@ -686,6 +807,7 @@ export const failCandidateResearch = internalMutation({
     jobId: v.id('sideEffectJobs'),
     claimToken: v.string(),
     retryable: v.boolean(),
+    retryAfterMs: v.optional(v.number()),
     summary: v.string(),
   },
   returns: v.null(),
@@ -696,6 +818,7 @@ export const failCandidateResearch = internalMutation({
       !candidate ||
       !job ||
       job.candidateId !== candidate._id ||
+      job.inputVersion !== candidate.inputVersion ||
       job.status !== 'running' ||
       job.claimToken !== args.claimToken
     )
@@ -707,6 +830,7 @@ export const failCandidateResearch = internalMutation({
       jobId: job._id,
       claimToken: args.claimToken,
       retryable: args.retryable,
+      retryAfterMs: args.retryAfterMs,
       summary: args.summary.slice(0, 300),
     })
     if (retry) {

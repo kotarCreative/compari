@@ -75,4 +75,12 @@ test('external errors classify retryability deterministically', () => {
     false,
   )
   assert.equal(classifyExternalError(new Error('timeout')).retryable, true)
+  assert.deepEqual(
+    classifyExternalError(
+      Object.assign(new Error('retryable_external: rate limited'), {
+        retryAfterMs: 60_000,
+      }),
+    ),
+    { retryable: true, summary: 'rate limited', retryAfterMs: 60_000 },
+  )
 })

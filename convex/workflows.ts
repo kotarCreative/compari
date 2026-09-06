@@ -104,14 +104,21 @@ export const discoverProviders = internalAction({
         requirements: request.corrections,
         answeredQuestions: request.answeredQuestions,
       })
-      const resultBatches = await Promise.all(
-        plan.discoveryQueries.map((query) =>
-          getWebResearchPort().searchProviders({
-            query,
-            limit: 6,
-          }),
-        ),
-      )
+      const resultBatches = []
+      let lastSearchError: unknown
+      for (const query of plan.discoveryQueries) {
+        try {
+          resultBatches.push(
+            await getWebResearchPort().searchProviders({
+              query,
+              limit: 6,
+            }),
+          )
+        } catch (error) {
+          lastSearchError = error
+        }
+      }
+      if (!resultBatches.length && lastSearchError) throw lastSearchError
       const results = uniqueProviderResults(resultBatches, 10)
       await ctx.runMutation(internal.workflowState.recordDiscovery, {
         ...args,
@@ -122,20 +129,13 @@ export const discoverProviders = internalAction({
       })
     } catch (error) {
       const classified = classifyExternalError(error)
-      const failure = await ctx.runMutation(
-        internal.sideEffectJobs.retryOrFail,
-        {
-          jobId: args.jobId,
-          claimToken: claim.claimToken,
-          retryable: classified.retryable,
-          summary: classified.summary,
-        },
-      )
-      if (failure?.retryAt)
-        await ctx.runMutation(internal.sideEffectJobs.scheduleRetry, {
-          jobId: args.jobId,
-          retryAt: failure.retryAt,
-        })
+      await ctx.runMutation(internal.workflowState.failDiscovery, {
+        ...args,
+        claimToken: claim.claimToken,
+        retryable: classified.retryable,
+        retryAfterMs: classified.retryAfterMs,
+        summary: classified.summary,
+      })
     }
     return null
   },
@@ -182,6 +182,7 @@ export const researchCandidate = internalAction({
         ...args,
         claimToken: claim.claimToken,
         retryable: classified.retryable,
+        retryAfterMs: classified.retryAfterMs,
         summary: classified.summary,
       })
     }

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "convex dev --start 'vite dev'",
     "reset:dev": "node --env-file-if-exists=.env.local scripts/reset-development-data.mjs --deployment dev",
-    "test": "node --experimental-strip-types --test convex/domain/demo.test.mjs convex/domain/inboxProvisioning.test.mjs convex/domain/workflowState.test.mjs convex/domain/decision.test.mjs convex/domain/webhook.test.mjs convex/domain/reasoning.test.mjs convex/domain/followUpPolicy.test.mjs convex/domain/ranking.test.mjs convex/domain/rankingSelection.test.mjs convex/domain/outboundPolicy.test.mjs convex/domain/researchEndpoints.test.mjs convex/domain/sideEffectPolicy.test.mjs convex/ports/agentMail.fakes.test.mjs convex/adapters/firecrawl.test.mjs convex/adapters/openai.test.mjs convex/adapters/reasoning.test.mjs src/features/request/evidencePolicy.test.mjs",
+    "test": "node --experimental-strip-types --test convex/domain/demo.test.mjs convex/domain/inboxProvisioning.test.mjs convex/domain/workflowState.test.mjs convex/domain/decision.test.mjs convex/domain/webhook.test.mjs convex/domain/reasoning.test.mjs convex/domain/followUpPolicy.test.mjs convex/domain/ranking.test.mjs convex/domain/rankingSelection.test.mjs convex/domain/outboundPolicy.test.mjs convex/domain/researchEndpoints.test.mjs convex/domain/sideEffectPolicy.test.mjs convex/ports/agentMail.fakes.test.mjs convex/adapters/firecrawl.test.mjs convex/adapters/openai.test.mjs convex/adapters/reasoning.test.mjs convex/adapters/runtime.test.mjs src/features/request/evidencePolicy.test.mjs",
     "test:run": "npm test",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",

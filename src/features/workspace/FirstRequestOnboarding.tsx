@@ -17,6 +17,7 @@ export function FirstRequestOnboarding({
   const create = useMutation(requestsApi.requests.create)
   const answerQuestion = useMutation(productApi.questions.answerForRequest)
   const retryIntake = useMutation(productApi.requests.retryIntake)
+  const retryDiscovery = useMutation(productApi.requests.retryDiscovery)
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(() =>
     window.sessionStorage.getItem(pendingFirstRequestIdKey),
   )
@@ -37,6 +38,7 @@ export function FirstRequestOnboarding({
   const [error, setError] = useState<string | null>(null)
   const [isAnswering, setIsAnswering] = useState(false)
   const [isRetryingIntake, setIsRetryingIntake] = useState(false)
+  const [isRetryingDiscovery, setIsRetryingDiscovery] = useState(false)
   const [createAttempt, setCreateAttempt] = useState(0)
   const isCreating = useRef(false)
   const firstOpenQuestion = detail?.questions.find(
@@ -45,6 +47,11 @@ export function FirstRequestOnboarding({
   const failedIntake = diagnostics?.jobs.find(
     (job) =>
       job.kind === 'extract_requirements' &&
+      (job.status === 'permanent_failure' || job.status === 'needs_user'),
+  )
+  const failedDiscovery = diagnostics?.jobs.find(
+    (job) =>
+      job.kind === 'discover_providers' &&
       (job.status === 'permanent_failure' || job.status === 'needs_user'),
   )
 
@@ -110,7 +117,12 @@ export function FirstRequestOnboarding({
         error={
           error ??
           failedIntake?.lastErrorSummary ??
-          (failedIntake ? 'Compari could not interpret this request.' : null)
+          (failedIntake
+            ? 'Compari could not interpret this request.'
+            : (failedDiscovery?.lastErrorSummary ??
+              (failedDiscovery
+                ? 'Compari could not research providers for this request.'
+                : null)))
         }
         history={
           detail?.questions.flatMap((question) =>
@@ -183,6 +195,29 @@ export function FirstRequestOnboarding({
           {isRetryingIntake
             ? 'Retrying interpretation…'
             : 'Retry interpretation'}
+        </Button>
+      ) : null}
+      {failedDiscovery && requestId ? (
+        <Button
+          className="mx-auto mt-4 flex"
+          disabled={isRetryingDiscovery}
+          onClick={() => {
+            setError(null)
+            setIsRetryingDiscovery(true)
+            void retryDiscovery({ requestId })
+              .catch((reason) =>
+                setError(
+                  errorMessage(
+                    reason,
+                    'Provider research could not be retried.',
+                  ),
+                ),
+              )
+              .finally(() => setIsRetryingDiscovery(false))
+          }}
+          variant="outline"
+        >
+          {isRetryingDiscovery ? 'Retrying research…' : 'Retry research'}
         </Button>
       ) : null}
     </main>

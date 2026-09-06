@@ -78,6 +78,12 @@ function toActivitySummary(event: Doc<'activityEvents'>) {
 
 const workflow = internal as unknown as {
   workflows: {
+    discoverProviders: FunctionReference<
+      'action',
+      'internal',
+      { requestId: Id<'procurementRequests'>; jobId: Id<'sideEffectJobs'> },
+      null
+    >
     extractRequirements: FunctionReference<
       'action',
       'internal',
@@ -181,10 +187,7 @@ export const resolvePending = query({
   returns: v.union(v.null(), v.id('procurementRequests')),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx)
-    const requestId = ctx.db.normalizeId(
-      'procurementRequests',
-      args.requestId,
-    )
+    const requestId = ctx.db.normalizeId('procurementRequests', args.requestId)
     if (!requestId) return null
     const request = await ctx.db.get('procurementRequests', requestId)
     return request?.userId === user._id ? requestId : null
@@ -314,6 +317,51 @@ export const retryIntake = mutation({
       createdAt: now,
     })
     await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+      requestId: request._id,
+      jobId: job._id,
+    })
+    return null
+  },
+})
+export const retryDiscovery = mutation({
+  args: { requestId: v.id('procurementRequests') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { request } = await requireOwnedRequest(ctx, args.requestId)
+    if (request.status !== 'researching' || request.automationPaused)
+      throw new Error('validation: provider research cannot be retried now')
+    const job = await ctx.db
+      .query('sideEffectJobs')
+      .withIndex('by_idempotency_key', (q) =>
+        q.eq('idempotencyKey', `discover:${request._id}:v${request.version}`),
+      )
+      .unique()
+    if (
+      !job ||
+      (job.status !== 'permanent_failure' && job.status !== 'needs_user')
+    )
+      throw new Error('validation: provider research does not need a retry')
+    const now = Date.now()
+    await ctx.db.patch('sideEffectJobs', job._id, {
+      status: 'pending',
+      attemptCount: 0,
+      lastErrorCategory: undefined,
+      lastErrorSummary: undefined,
+      scheduledAt: now,
+      updatedAt: now,
+    })
+    await ctx.db.patch('procurementRequests', request._id, {
+      researchStatus: 'in_progress',
+      updatedAt: now,
+    })
+    await ctx.db.insert('activityEvents', {
+      requestId: request._id,
+      eventType: 'provider_research_retried',
+      safeMessage: 'Provider research was retried by the buyer.',
+      correlationId: String(job._id),
+      createdAt: now,
+    })
+    await ctx.scheduler.runAfter(0, workflow.workflows.discoverProviders, {
       requestId: request._id,
       jobId: job._id,
     })

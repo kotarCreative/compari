@@ -50,6 +50,7 @@ export const retryOrFail = internalMutation({
     claimToken: v.string(),
     summary: v.string(),
     retryable: v.boolean(),
+    retryAfterMs: v.optional(v.number()),
   },
   returns: v.union(v.null(), v.object({ retryAt: v.optional(v.number()) })),
   handler: async (ctx, args) => {
@@ -62,7 +63,9 @@ export const retryOrFail = internalMutation({
       attemptCount: job.attemptCount,
       maxAttempts: job.maxAttempts,
     })
-    const retryAt = canRetry ? now + retryDelayMs(job.attemptCount) : undefined
+    const retryAt = canRetry
+      ? now + retryDelayMs(job.attemptCount, args.retryAfterMs)
+      : undefined
     await ctx.db.patch('sideEffectJobs', job._id, {
       status: canRetry ? 'retryable_failure' : 'permanent_failure',
       lastErrorCategory: canRetry ? 'retryable_external' : 'permanent_external',

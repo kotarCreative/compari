@@ -62,11 +62,21 @@ export function validateOutboundPreflight(
 export function classifyExternalError(error: unknown): {
   retryable: boolean
   summary: string
+  retryAfterMs?: number
 } {
   const summary =
     error instanceof Error
       ? error.message.slice(0, 300)
       : 'external operation failed'
+  const retryAfterMs =
+    error &&
+    typeof error === 'object' &&
+    'retryAfterMs' in error &&
+    typeof error.retryAfterMs === 'number' &&
+    Number.isFinite(error.retryAfterMs) &&
+    error.retryAfterMs > 0
+      ? error.retryAfterMs
+      : undefined
   return {
     retryable:
       /^retryable_external:/i.test(summary) ||
@@ -75,5 +85,6 @@ export function classifyExternalError(error: unknown): {
       /^(retryable_external|permanent_external|needs_user):\s*/i,
       '',
     ),
+    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
   }
 }

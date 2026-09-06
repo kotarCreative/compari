@@ -199,6 +199,12 @@ export const productApi = api as unknown as {
       { requestId: string },
       null
     >
+    retryDiscovery: FunctionReference<
+      'mutation',
+      'public',
+      { requestId: string },
+      null
+    >
     cancel: FunctionReference<'mutation', 'public', { requestId: string }, null>
   }
   outreach: {
