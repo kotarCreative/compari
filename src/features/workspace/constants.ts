@@ -1,8 +1,5 @@
 export const pendingFirstRequestKey = 'compari.pending-first-request'
 export const pendingFirstRequestIdKey = 'compari.pending-first-request-id'
-export const pendingFirstLocationKey = 'compari.pending-first-location'
-export const pendingFirstAskForLocationKey =
-  'compari.pending-first-ask-for-location'
 export const pendingFirstNameKey = 'compari.pending-first-name'
 export const pendingLastNameKey = 'compari.pending-last-name'
 export const onboardingStartedAtKey = 'compari.onboarding-started-at'

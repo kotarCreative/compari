@@ -111,8 +111,6 @@ export function questionsAreSimilar(left: string, right: string) {
   return shared >= 2 && shared / smallerSize >= 0.75
 }
 
-export const buyerLocationQuestion =
-  'Where are you located, or where should we search for providers?'
 export function validateBoundedJson(value: unknown) {
   if (!isBoundedJson(value, 0))
     throw new Error('validation: value has unsupported JSON structure')

@@ -1,12 +1,7 @@
 import { useMutation, useQuery } from 'convex/react'
 import { useEffect, useRef, useState } from 'react'
 import { productApi } from '../request/contracts'
-import {
-  pendingFirstAskForLocationKey,
-  pendingFirstLocationKey,
-  pendingFirstRequestIdKey,
-  pendingFirstRequestKey,
-} from './constants'
+import { pendingFirstRequestIdKey, pendingFirstRequestKey } from './constants'
 import { requestsApi } from './contracts'
 import { RequestConversation } from './RequestConversation'
 import { Button } from '~/components/ui'
@@ -38,12 +33,6 @@ export function FirstRequestOnboarding({
   const [isAnswering, setIsAnswering] = useState(false)
   const [isRetryingIntake, setIsRetryingIntake] = useState(false)
   const [createAttempt, setCreateAttempt] = useState(0)
-  const [requestLocation] = useState(() => ({
-    location:
-      window.sessionStorage.getItem(pendingFirstLocationKey) ?? undefined,
-    askForLocation:
-      window.sessionStorage.getItem(pendingFirstAskForLocationKey) === 'true',
-  }))
   const isCreating = useRef(false)
   const firstOpenQuestion = detail?.questions.find(
     (question) => question.status === 'open',
@@ -58,7 +47,7 @@ export function FirstRequestOnboarding({
     if (requestId || isCreating.current) return
     isCreating.current = true
     setError(null)
-    void create({ prompt, ...requestLocation })
+    void create({ prompt })
       .then((createdRequestId) => {
         window.sessionStorage.setItem(
           pendingFirstRequestIdKey,
@@ -70,7 +59,7 @@ export function FirstRequestOnboarding({
         setError(errorMessage(reason, 'Unable to create your first request.'))
         isCreating.current = false
       })
-  }, [create, createAttempt, prompt, requestId, requestLocation])
+  }, [create, createAttempt, prompt, requestId])
 
   useEffect(() => {
     setAnswerDraft('')
@@ -95,8 +84,6 @@ export function FirstRequestOnboarding({
     const timeout = window.setTimeout(() => {
       window.sessionStorage.removeItem(pendingFirstRequestKey)
       window.sessionStorage.removeItem(pendingFirstRequestIdKey)
-      window.sessionStorage.removeItem(pendingFirstLocationKey)
-      window.sessionStorage.removeItem(pendingFirstAskForLocationKey)
       onComplete(detail.request._id)
     }, 2_000)
     return () => window.clearTimeout(timeout)

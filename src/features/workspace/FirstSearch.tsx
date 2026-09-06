@@ -2,15 +2,12 @@ import { useAuthActions } from '@convex-dev/auth/react'
 import { useState } from 'react'
 import {
   onboardingStartedAtKey,
-  pendingFirstAskForLocationKey,
-  pendingFirstLocationKey,
   pendingFirstNameKey,
   pendingFirstRequestKey,
   pendingLastNameKey,
   requestPromptPlaceholder,
   splitFullName,
 } from './constants'
-import { getRequestLocation } from './location'
 import { RequestConversation } from './RequestConversation'
 import type { FormEvent } from 'react'
 import { Input, Label, Textarea } from '~/components/ui'
@@ -44,21 +41,10 @@ export function FirstSearch() {
     }
     setIsStarting(true)
     try {
-      const requestLocation = await getRequestLocation()
       window.sessionStorage.setItem(onboardingStartedAtKey, String(Date.now()))
       window.sessionStorage.setItem(pendingFirstRequestKey, prompt.trim())
       window.sessionStorage.setItem(pendingFirstNameKey, name.firstName)
       window.sessionStorage.setItem(pendingLastNameKey, name.lastName)
-      window.sessionStorage.setItem(
-        pendingFirstAskForLocationKey,
-        String(requestLocation.askForLocation),
-      )
-      if (requestLocation.location)
-        window.sessionStorage.setItem(
-          pendingFirstLocationKey,
-          requestLocation.location,
-        )
-      else window.sessionStorage.removeItem(pendingFirstLocationKey)
       const result = await signIn('anonymous')
       if (!result.signingIn)
         throw new Error('Anonymous sign-in did not establish a session.')
@@ -158,8 +144,7 @@ export function FirstSearch() {
             <p className="text-xs text-slate-500">
               Press <kbd className="font-sans">⌘/Ctrl</kbd> +{' '}
               <kbd className="font-sans">Enter</kbd> to start searching for
-              vendors. We’ll ask for your approximate location to make results
-              more relevant.
+              vendors.
             </p>
             {error ? (
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>

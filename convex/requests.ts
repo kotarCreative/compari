@@ -6,11 +6,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireCurrentUser, requireOwnedRequest } from './lib/auth'
-import {
-  buyerLocationQuestion,
-  canResearch,
-  transitionRequest,
-} from './domain/workflowState'
+import { canResearch, transitionRequest } from './domain/workflowState'
 import type { FunctionReference } from 'convex/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -95,7 +91,6 @@ export const create = mutation({
   args: {
     prompt: v.string(),
     location: v.optional(v.string()),
-    askForLocation: v.optional(v.boolean()),
   },
   returns: v.id('procurementRequests'),
   handler: async (ctx, args) => {
@@ -132,16 +127,6 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     })
-    if (args.askForLocation && !location)
-      await ctx.db.insert('questions', {
-        requestId,
-        text: buyerLocationQuestion,
-        importance: 'required',
-        status: 'open',
-        supportingFactIds: [],
-        createdAt: now,
-        updatedAt: now,
-      })
     const jobId = await ctx.db.insert('sideEffectJobs', {
       userId: user._id,
       kind: 'extract_requirements',
