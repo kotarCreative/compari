@@ -2,7 +2,7 @@
 
 - **Project:** Compari
 - **Event:** Convex All Gas Hackathon
-- **What it does:** A buyer-side procurement workflow in development that turns requests into evidence-backed provider comparisons, with bounded automated research/outreach and an explicit final-choice gate.
+- **What it does:** A buyer-side procurement workflow in development that turns requests and approximate buyer location into relevant, evidence-backed provider comparisons, with bounded automated research/outreach and an explicit final-choice gate.
 - **Live app:** not deployed
 - **Repo:** none
 - **Frontend:** Other (TanStack Start)
@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-04T02:14:29Z
+- **Last updated:** 2026-09-06T03:33:59Z
 
 ## Log
 
@@ -75,3 +75,31 @@ answered questions; Firecrawl deduplicates the results, finds relevant pages on
 each vendor site, and scrapes up to five pages (`convex/adapters/reasoning.ts`,
 `convex/adapters/firecrawl.ts`, `convex/workflows.ts`). Local tests, typecheck,
 lint, and the production build pass.
+
+### 2026-09-05 - 6f6a849
+
+Improved provider discovery reliability by supporting Firecrawl's current v2
+result envelope and excluding source repositories, package registries,
+developer documentation, and configuration files from vendor candidates
+(`convex/adapters/firecrawl.ts`, `convex/adapters/reasoning.ts`). Requests now
+use rounded browser coordinates when permitted; otherwise intake asks where to
+search and waits for the answer before discovery (`src/features/workspace/`,
+`convex/requests.ts`, `convex/workflowState.ts`). Also streamlined the request
+and decision views and added a deployment-guarded development reset helper.
+The test suite, typecheck, lint, production build, and Convex development
+validation pass.
+
+### 2026-09-06 - 5a78384
+
+Made first-request onboarding recover from deleted or stale session request IDs,
+restored users after development data resets, and added clearer onboarding and
+research progress states (`convex/users.ts`, `convex/requests.ts`,
+`src/features/workspace/`). Provider discovery now waits until buyer questions
+are answered, ignores stale request versions, searches sequentially, staggers
+candidate research, honors Firecrawl retry timing, settles terminal failures,
+and offers a manual research retry (`convex/workflowState.ts`,
+`convex/workflows.ts`, `convex/adapters/firecrawl.ts`). A live development run
+answered all three intake questions, completed discovery and ranking, and
+qualified 7 of 10 candidates without Firecrawl rate-limit failures. All 56
+tests, typecheck, lint, production build, and Convex development validation
+pass.
