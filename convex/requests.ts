@@ -176,6 +176,20 @@ export const get = query({
     return toRequestSummary(request)
   },
 })
+export const resolvePending = query({
+  args: { requestId: v.string() },
+  returns: v.union(v.null(), v.id('procurementRequests')),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx)
+    const requestId = ctx.db.normalizeId(
+      'procurementRequests',
+      args.requestId,
+    )
+    if (!requestId) return null
+    const request = await ctx.db.get('procurementRequests', requestId)
+    return request?.userId === user._id ? requestId : null
+  },
+})
 export const cancel = mutation({
   args: { requestId: v.id('procurementRequests') },
   returns: v.null(),

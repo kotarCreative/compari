@@ -17,9 +17,14 @@ export function FirstRequestOnboarding({
   const create = useMutation(requestsApi.requests.create)
   const answerQuestion = useMutation(productApi.questions.answerForRequest)
   const retryIntake = useMutation(productApi.requests.retryIntake)
-  const [requestId, setRequestId] = useState<string | null>(() =>
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(() =>
     window.sessionStorage.getItem(pendingFirstRequestIdKey),
   )
+  const resolvedPendingRequestId = useQuery(
+    requestsApi.requests.resolvePending,
+    pendingRequestId ? { requestId: pendingRequestId } : 'skip',
+  )
+  const requestId = resolvedPendingRequestId ?? null
   const detail = useQuery(
     productApi.requestDetails.get,
     requestId ? { requestId } : 'skip',
@@ -44,7 +49,13 @@ export function FirstRequestOnboarding({
   )
 
   useEffect(() => {
-    if (requestId || isCreating.current) return
+    if (!pendingRequestId || resolvedPendingRequestId !== null) return
+    window.sessionStorage.removeItem(pendingFirstRequestIdKey)
+    setPendingRequestId(null)
+  }, [pendingRequestId, resolvedPendingRequestId])
+
+  useEffect(() => {
+    if (pendingRequestId || isCreating.current) return
     isCreating.current = true
     setError(null)
     void create({ prompt })
@@ -53,13 +64,13 @@ export function FirstRequestOnboarding({
           pendingFirstRequestIdKey,
           createdRequestId,
         )
-        setRequestId(createdRequestId)
+        setPendingRequestId(createdRequestId)
       })
       .catch((reason) => {
         setError(errorMessage(reason, 'Unable to create your first request.'))
         isCreating.current = false
       })
-  }, [create, createAttempt, prompt, requestId])
+  }, [create, createAttempt, pendingRequestId, prompt])
 
   useEffect(() => {
     setAnswerDraft('')

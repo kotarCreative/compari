@@ -65,6 +65,12 @@ export const requestsApi = api as unknown as {
       { paginationOpts: { numItems: number; cursor: string | null } },
       RequestList
     >
+    resolvePending: FunctionReference<
+      'query',
+      'public',
+      { requestId: string },
+      string | null
+    >
     pauseAutomation: FunctionReference<
       'mutation',
       'public',
