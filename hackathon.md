@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-06T03:33:59Z
+- **Last updated:** 2026-09-06T15:18:38Z
 
 ## Log
 
@@ -103,3 +103,14 @@ answered all three intake questions, completed discovery and ranking, and
 qualified 7 of 10 candidates without Firecrawl rate-limit failures. All 56
 tests, typecheck, lint, production build, and Convex development validation
 pass.
+
+### 2026-09-06 - 166df20
+
+Improved provider discovery with requirement-aware commercial searches, relevance
+ranking, directory/listicle filtering, and bounded same-site service and contact
+research. Outreach now generates provider-specific, human-readable emails from
+structured requirements, persists drafts for idempotent retries, normalizes
+AgentMail send keys, and exposes retry status in the request view
+(`convex/adapters/firecrawl.ts`, `convex/adapters/reasoning.ts`,
+`convex/outreachWorkflow.ts`, `src/features/request/RequestDetail.tsx`).
+Tests, typecheck, lint, and Convex development validation pass.
