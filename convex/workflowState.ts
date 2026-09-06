@@ -129,6 +129,20 @@ export const loadRequestForJob = internalQuery({
           confidence: v.number(),
         }),
       ),
+      requirements: v.array(
+        v.object({
+          key: v.string(),
+          label: v.string(),
+          value: v.any(),
+          kind: v.union(
+            v.literal('hard_constraint'),
+            v.literal('preference'),
+            v.literal('information'),
+          ),
+          importance: v.optional(v.number()),
+          confidence: v.number(),
+        }),
+      ),
       answeredQuestions: v.array(
         v.object({
           question: v.string(),
@@ -177,6 +191,14 @@ export const loadRequestForJob = internalQuery({
           importance: item.importance,
           confidence: item.confidence,
         })),
+      requirements: corrections.map((item) => ({
+        key: item.key,
+        label: item.label,
+        value: item.value.value,
+        kind: item.kind,
+        importance: item.importance,
+        confidence: item.confidence,
+      })),
       answeredQuestions: answeredQuestions.flatMap((question) =>
         question.answer === undefined
           ? []

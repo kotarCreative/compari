@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   createDeterministicReasoningPort,
   normalizeIntake,
+  normalizeOutreachEmail,
   normalizeProviderSearchPlan,
   normalizeProviderResponse,
 } from './reasoning.ts'
@@ -86,29 +87,83 @@ test('provider search planning uses the original prompt and buyer answers', asyn
       { question: 'How many guests?', answer: 'Space for 45 people' },
     ],
   })
-  assert.equal(plan.discoveryQueries.length, 2)
+  assert.equal(plan.discoveryQueries.length, 3)
   assert.match(plan.discoveryQueries[0] ?? '', /venue/i)
   assert.match(plan.discoveryQueries[0] ?? '', /45 people/i)
   assert.match(plan.discoveryQueries[0] ?? '', /Canmore, Alberta/i)
   assert.match(plan.vendorDetailQuery, /pricing/i)
 })
 
+test('outreach composition turns structured requirements into human prose', async () => {
+  const port = createDeterministicReasoningPort()
+  const email = await port.composeOutreachEmail({
+    originalRequest:
+      'Need 500 brochures. Matte. Under $700. Friday. Please help me.',
+    requestTitle: 'Brochure printing',
+    location: 'Calgary, Alberta',
+    buyerName: 'Taylor',
+    providerName: 'Acme Print',
+    requirements: [
+      { label: 'Quantity', value: '500', kind: 'hard_constraint' },
+      { label: 'Finish', value: 'matte', kind: 'preference' },
+    ],
+  })
+  assert.match(email.body, /Hi Acme Print team/)
+  assert.match(email.body, /I’m helping Taylor/)
+  assert.doesNotMatch(email.body, /Need 500 brochures\. Matte\./)
+  assert.doesNotMatch(email.body, /factual details only/i)
+})
+
+test('outreach normalization rejects pasted requests and robotic wording', () => {
+  const original =
+    'I need a commercial printer to produce five hundred matte brochures before our conference next month in Calgary.'
+  assert.equal(
+    normalizeOutreachEmail(
+      {
+        subject: 'Brochure printing request',
+        body: `Hello,\n\n${original}\n\nCould you send a quote and your availability? Thanks very much for your time.`,
+      },
+      original,
+    ),
+    null,
+  )
+  assert.equal(
+    normalizeOutreachEmail(
+      {
+        subject: 'Brochure printing request',
+        body: 'Hello, could you provide factual details only about this job? We would also appreciate current pricing, availability, turnaround time, and information about what your service includes. Thank you.',
+      },
+      'Need brochures',
+    ),
+    null,
+  )
+})
+
 test('search plan normalization bounds and deduplicates agent queries', () => {
   assert.deepEqual(
     normalizeProviderSearchPlan({
       schemaVersion: 1,
-      discoveryQueries: [' local caterer ', 'local caterer', 'event catering'],
+      discoveryQueries: [
+        ' local caterer ',
+        'local caterer',
+        'event catering',
+        'corporate lunch supplier',
+      ],
       vendorDetailQuery: 'menus pricing delivery area contact',
     }),
     {
-      discoveryQueries: ['local caterer', 'event catering'],
+      discoveryQueries: [
+        'local caterer',
+        'event catering',
+        'corporate lunch supplier',
+      ],
       vendorDetailQuery: 'menus pricing delivery area contact',
     },
   )
   assert.equal(
     normalizeProviderSearchPlan({
       schemaVersion: 1,
-      discoveryQueries: ['only one'],
+      discoveryQueries: ['only one', 'only two'],
       vendorDetailQuery: 'details',
     }),
     null,

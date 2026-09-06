@@ -15,6 +15,18 @@ const actionArgs = {
   claimToken: v.string(),
 }
 
+const outreachRequirement = v.object({
+  label: v.string(),
+  value: v.string(),
+  kind: v.union(
+    v.literal('hard_constraint'),
+    v.literal('preference'),
+    v.literal('information'),
+  ),
+})
+
+const outreachDraft = v.object({ subject: v.string(), body: v.string() })
+
 export const load = internalQuery({
   args: actionArgs,
   returns: v.union(
@@ -23,9 +35,16 @@ export const load = internalQuery({
       method: v.union(v.literal('email'), v.literal('form')),
       inboxId: v.string(),
       endpoint: v.string(),
-      subject: v.string(),
-      body: v.string(),
       idempotencyKey: v.string(),
+      draft: v.optional(outreachDraft),
+      composition: v.object({
+        originalRequest: v.string(),
+        requestTitle: v.string(),
+        location: v.optional(v.string()),
+        buyerName: v.string(),
+        providerName: v.string(),
+        requirements: v.array(outreachRequirement),
+      }),
     }),
   ),
   handler: async (ctx, args) => {
@@ -48,11 +67,15 @@ export const load = internalQuery({
     const candidate = await ctx.db.get('requestCandidates', attempt.candidateId)
     const endpoint = await ctx.db.get('contactEndpoints', attempt.endpointId)
     const user = request ? await ctx.db.get('users', request.userId) : null
+    const business = candidate
+      ? await ctx.db.get('businesses', candidate.businessId)
+      : null
     if (
       !request ||
       !candidate ||
       !endpoint ||
       !user ||
+      !business ||
       request.automationPaused ||
       !['researching', 'contacting'].includes(request.status) ||
       candidate.status !== 'queued_for_contact' ||
@@ -62,6 +85,123 @@ export const load = internalQuery({
       endpoint.type !== (attempt.method === 'email' ? 'email' : 'contact_form')
     )
       return null
+    const [queued, contacted, previousSucceeded, requirements] =
+      await Promise.all([
+        ctx.db
+          .query('requestCandidates')
+          .withIndex('by_request_id_and_status', (q) =>
+            q.eq('requestId', request._id).eq('status', 'queued_for_contact'),
+          )
+          .take(6),
+        ctx.db
+          .query('requestCandidates')
+          .withIndex('by_request_id_and_status', (q) =>
+            q.eq('requestId', request._id).eq('status', 'contacted'),
+          )
+          .take(6),
+        ctx.db
+          .query('outreachAttempts')
+          .withIndex('by_candidate_id_and_status', (q) =>
+            q.eq('candidateId', candidate._id).eq('status', 'succeeded'),
+          )
+          .first(),
+        ctx.db
+          .query('requirements')
+          .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+          .take(30),
+      ])
+    const existingDraft =
+      attempt.draftSubject && attempt.draftBody
+        ? { subject: attempt.draftSubject, body: attempt.draftBody }
+        : undefined
+    const preflightDraft = existingDraft ?? {
+      subject: `Question about ${request.title}`.slice(0, 100),
+      body: `I’m helping ${user.name} gather information about ${request.title.toLowerCase()}. Could you let me know if your team may be able to help?`,
+    }
+    if (
+      validateOutboundPreflight({
+        requestStatus: request.status,
+        requestVersion: request.version,
+        jobInputVersion: job.inputVersion,
+        paused: request.automationPaused,
+        candidateQueued: true,
+        endpointType: attempt.method,
+        endpointVerified:
+          endpoint.verificationState === 'public' ||
+          endpoint.verificationState === 'verified',
+        endpointValue: endpoint.value,
+        stableReplyAddress: user.agentEmailAddress,
+        previousSucceeded: Boolean(previousSucceeded),
+        withinCap: queued.length + contacted.length <= 5,
+        subject: preflightDraft.subject,
+        body: preflightDraft.body,
+      })
+    )
+      return null
+    return {
+      method: attempt.method,
+      inboxId: user.agentMailInboxId,
+      endpoint: endpoint.value,
+      idempotencyKey: job.idempotencyKey,
+      draft: existingDraft,
+      composition: {
+        originalRequest: request.prompt.slice(0, 4_000),
+        requestTitle: request.title.slice(0, 120),
+        location: request.location,
+        buyerName: user.name.slice(0, 160),
+        providerName: business.canonicalName.slice(0, 160),
+        requirements: requirements.map((item) => ({
+          label: item.label.slice(0, 160),
+          value: displayRequirementValue(item.value.value).slice(0, 1_000),
+          kind: item.kind,
+        })),
+      },
+    }
+  },
+})
+
+/** Persist the exact reviewed draft before the external send. A retry reuses
+ * these bytes with the same idempotency key instead of generating a different
+ * message that could be recorded against the first provider response. */
+export const saveDraft = internalMutation({
+  args: { ...actionArgs, subject: v.string(), body: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const attempt = await ctx.db.get('outreachAttempts', args.attemptId)
+    const job = await ctx.db.get('sideEffectJobs', args.jobId)
+    if (
+      !attempt ||
+      !job ||
+      attempt.jobId !== job._id ||
+      (attempt.status !== 'pending' &&
+        attempt.status !== 'retryable_failure') ||
+      job.status !== 'running' ||
+      job.claimToken !== args.claimToken ||
+      job.outreachAttemptId !== attempt._id ||
+      job.requestId !== attempt.requestId ||
+      job.candidateId !== attempt.candidateId
+    )
+      return false
+    if (attempt.draftSubject || attempt.draftBody)
+      return (
+        attempt.draftSubject === args.subject && attempt.draftBody === args.body
+      )
+    const request = await ctx.db.get('procurementRequests', attempt.requestId)
+    const candidate = await ctx.db.get('requestCandidates', attempt.candidateId)
+    const endpoint = await ctx.db.get('contactEndpoints', attempt.endpointId)
+    const user = request ? await ctx.db.get('users', request.userId) : null
+    if (
+      !request ||
+      !candidate ||
+      !endpoint ||
+      !user?.agentMailInboxId ||
+      !user.agentEmailAddress ||
+      request.automationPaused ||
+      !['researching', 'contacting'].includes(request.status) ||
+      candidate.status !== 'queued_for_contact' ||
+      endpoint.type !== (attempt.method === 'email' ? 'email' : 'contact_form')
+    )
+      return false
     const [queued, contacted, previousSucceeded] = await Promise.all([
       ctx.db
         .query('requestCandidates')
@@ -82,36 +222,34 @@ export const load = internalQuery({
         )
         .first(),
     ])
-    const subject = `Information request: ${request.title}`
-    const body = `I’m coordinating options on behalf of a buyer. Could you share price, availability, scope, exclusions, and timing for: ${request.prompt.slice(0, 1200)}\n\nPlease reply to ${user.agentEmailAddress} with factual details only.\n\nThanks,\n${user.name}`
-    if (
-      validateOutboundPreflight({
-        requestStatus: request.status,
-        requestVersion: request.version,
-        jobInputVersion: job.inputVersion,
-        paused: request.automationPaused,
-        candidateQueued: true,
-        endpointType: attempt.method,
-        endpointVerified:
-          endpoint.verificationState === 'public' ||
-          endpoint.verificationState === 'verified',
-        endpointValue: endpoint.value,
-        stableReplyAddress: user.agentEmailAddress,
-        previousSucceeded: Boolean(previousSucceeded),
-        withinCap: queued.length + contacted.length <= 5,
-        subject,
-        body,
-      })
-    )
-      return null
-    return {
-      method: attempt.method,
-      inboxId: user.agentMailInboxId,
-      endpoint: endpoint.value,
-      subject,
-      body,
-      idempotencyKey: job.idempotencyKey,
-    }
+    const rejection = validateOutboundPreflight({
+      requestStatus: request.status,
+      requestVersion: request.version,
+      jobInputVersion: job.inputVersion,
+      paused: request.automationPaused,
+      candidateQueued: true,
+      endpointType: attempt.method,
+      endpointVerified:
+        endpoint.verificationState === 'public' ||
+        endpoint.verificationState === 'verified',
+      endpointValue: endpoint.value,
+      stableReplyAddress: user.agentEmailAddress,
+      previousSucceeded: Boolean(previousSucceeded),
+      withinCap: queued.length + contacted.length <= 5,
+      subject: args.subject,
+      body: args.body,
+    })
+    if (rejection) return false
+    await ctx.db.patch('outreachAttempts', attempt._id, {
+      draftSubject: args.subject,
+      draftBody: args.body,
+      contentSummary: `Personalized information request: ${args.subject}`.slice(
+        0,
+        500,
+      ),
+      updatedAt: Date.now(),
+    })
+    return true
   },
 })
 
@@ -136,6 +274,8 @@ export const complete = internalMutation({
       job.outreachAttemptId !== attempt._id ||
       job.requestId !== attempt.requestId ||
       job.candidateId !== attempt.candidateId ||
+      attempt.draftSubject !== args.subject ||
+      attempt.draftBody !== args.body ||
       (attempt.status !== 'pending' && attempt.status !== 'retryable_failure')
     )
       return null
@@ -254,6 +394,17 @@ export const complete = internalMutation({
     return null
   },
 })
+
+function displayRequirementValue(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return 'Provided by the buyer'
+  }
+}
 
 export const block = internalMutation({
   args: { ...actionArgs, retryable: v.boolean(), summary: v.string() },

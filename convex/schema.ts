@@ -309,6 +309,8 @@ export default defineSchema({
     jobId: v.id('sideEffectJobs'),
     vendorMessageId: v.optional(v.string()),
     vendorSubmissionId: v.optional(v.string()),
+    draftSubject: v.optional(v.string()),
+    draftBody: v.optional(v.string()),
     contentSummary: v.string(),
     safeError: v.optional(v.string()),
     createdAt: v.number(),

@@ -5,6 +5,7 @@ import { isDemoMode } from './runtime.ts'
 import type {
   AnsweredQuestion,
   ExtractedRequirement,
+  OutreachEmailContext,
   ReasoningPort,
 } from '../ports/reasoning'
 
@@ -48,13 +49,26 @@ class OpenAIReasoningAdapter implements ReasoningPort {
       name: 'provider_search_plan',
       schema: providerSearchPlanSchema,
       system:
-        'Plan web research for a procurement request. Infer the buyer intent from the original prompt, extracted requirements, and answered questions; answers are authoritative. Return 2 to 4 concise, distinct search-engine queries that look for actual businesses capable of fulfilling the request, not informational pages, source code, developer documentation, package registries, configuration files, or pages that merely repeat the buyer message. Include vendor, supplier, company, or service terms plus the relevant location or capability. Do not include sensitive personal details. Also return a concise vendorDetailQuery containing the capability, pricing, service-area, and contact terms that should be investigated on each vendor website. Do not include URLs or site: operators.',
+        'Plan high-precision web research for a procurement request. Infer the exact product or service category from the original prompt, all extracted requirements, and answered questions; buyer answers are authoritative. Return 3 to 4 short, distinct search-engine queries aimed at official websites of businesses that can actually fulfill the request. Cover: (1) the exact capability and location, (2) the most discriminating hard constraint or specialty, and (3) a commercial-intent variation such as supplier, contractor, studio, manufacturer, venue, or service company—whichever naturally fits the category. Prefer terms a real provider uses to describe itself. Exclude informational pages, directories, marketplaces, listicles, reviews, jobs, source code, documentation, and pages that merely repeat the request. Never include sensitive personal details, prose instructions, URLs, or site: operators. Also return a concise vendorDetailQuery with the specific services, constraints, pricing or quote information, service area, availability, and contact details to investigate on each official website.',
       user: JSON.stringify(input).slice(0, 24_000),
     })
     const result = normalizeProviderSearchPlan(value)
     if (!result)
       throw new Error('needs_user: OpenAI returned an invalid search plan')
     return result
+  }
+
+  async composeOutreachEmail(input: OutreachEmailContext) {
+    const value = await generateOpenAIStructuredOutput({
+      operation: 'reasoning',
+      name: 'provider_outreach_email',
+      schema: outreachEmailSchema,
+      system:
+        'Write a concise, natural business email to a prospective provider. You are a procurement coordinator helping the named buyer; disclose that plainly and never pretend the buyer personally wrote the message. Synthesize the request into fluent prose using the structured requirements as the source of truth. The original request is context only: never paste it, quote it wholesale, reproduce awkward fragments, or introduce facts that are not supplied. Address the provider by name when natural. Explain the need in one short paragraph, then ask only for useful missing details such as fit, pricing, availability, timing, inclusions, or exclusions. Do not mechanically ask for information already present in the requirements. Use a warm, professional tone, contractions where natural, complete sentences, and short paragraphs. Avoid headings, bullet-point questionnaires, robotic phrases such as “factual details only,” sales language, urgency pressure, and mentioning internal systems. Do not include phone numbers, private contact details, promises, acceptance, negotiation, or commitments. Close politely and identify that the message is sent on behalf of the buyer. Return only a subject and plain-text body. Keep the subject specific and under 100 characters and the body between about 90 and 180 words.',
+      user: JSON.stringify(input).slice(0, 24_000),
+    })
+    const result = normalizeOutreachEmail(value, input.originalRequest)
+    return result ?? deterministicOutreachEmail(input)
   }
 
   async extractProviderResponse(input: { delimitedBody: string }) {
@@ -192,11 +206,21 @@ const providerSearchPlanSchema = {
     schemaVersion: { type: 'integer', enum: [1] },
     discoveryQueries: {
       type: 'array',
-      minItems: 2,
+      minItems: 3,
       maxItems: 4,
       items: { type: 'string', minLength: 3, maxLength: 240 },
     },
     vendorDetailQuery: { type: 'string', minLength: 3, maxLength: 240 },
+  },
+}
+
+const outreachEmailSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['subject', 'body'],
+  properties: {
+    subject: { type: 'string', minLength: 3, maxLength: 100 },
+    body: { type: 'string', minLength: 80, maxLength: 1_800 },
   },
 }
 
@@ -218,8 +242,40 @@ export function normalizeProviderSearchPlan(value: unknown): SearchPlan | null {
     ),
   ].slice(0, 4)
   const vendorDetailQuery = value.vendorDetailQuery.trim().slice(0, 240)
-  if (discoveryQueries.length < 2 || vendorDetailQuery.length < 3) return null
+  if (discoveryQueries.length < 3 || vendorDetailQuery.length < 3) return null
   return { discoveryQueries, vendorDetailQuery }
+}
+
+export function normalizeOutreachEmail(
+  value: unknown,
+  originalRequest: string,
+): { subject: string; body: string } | null {
+  if (
+    !isRecord(value) ||
+    typeof value.subject !== 'string' ||
+    typeof value.body !== 'string'
+  )
+    return null
+  const subject = value.subject
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, 100)
+  const body = value.body.trim()
+  if (
+    subject.length < 3 ||
+    body.length < 80 ||
+    body.length > 1_800 ||
+    /\bfactual details only\b/i.test(body)
+  )
+    return null
+  const normalizedOriginal = normalizeComparableText(originalRequest)
+  const normalizedBody = normalizeComparableText(body)
+  if (
+    normalizedOriginal.length >= 40 &&
+    normalizedBody.includes(normalizedOriginal)
+  )
+    return null
+  return { subject, body }
 }
 
 export function normalizeIntake(value: unknown): IntakeResult | null {
@@ -414,9 +470,13 @@ export function createDeterministicReasoningPort(): ReasoningPort {
         discoveryQueries: [
           `${intent}${place} vendor`,
           `${intent}${place} supplier company`,
+          `${intent}${place} local service quote`,
         ],
         vendorDetailQuery: `${intent} services capabilities pricing service area contact`,
       })
+    },
+    composeOutreachEmail(input) {
+      return Promise.resolve(deterministicOutreachEmail(input))
     },
     extractProviderResponse({ delimitedBody }) {
       const body = delimitedBody.slice(0, 40_000)
@@ -464,4 +524,34 @@ export function createDeterministicReasoningPort(): ReasoningPort {
       })
     },
   }
+}
+
+function normalizeComparableText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function deterministicOutreachEmail(input: OutreachEmailContext): {
+  subject: string
+  body: string
+} {
+  const details = input.requirements
+    .slice(0, 5)
+    .map((item) => `${item.label.toLowerCase()} is ${item.value}`)
+  const location = input.location ? ` in ${input.location}` : ''
+  const requirementSentence = details.length
+    ? ` The current requirements are ${joinNaturalLanguage(details)}.`
+    : ''
+  return {
+    subject: `Question about ${input.requestTitle}`.slice(0, 100),
+    body: `Hi ${input.providerName} team,\n\nI’m helping ${input.buyerName} arrange ${input.requestTitle.toLowerCase()}${location}.${requirementSentence} Could you let me know whether this is something your team can help with? If so, I’d appreciate any relevant pricing, availability, expected timing, and important inclusions or exclusions that aren’t covered above.\n\nThanks for your time,\nCompari\nOn behalf of ${input.buyerName}`,
+  }
+}
+
+function joinNaturalLanguage(items: Array<string>): string {
+  if (items.length <= 1) return items[0] ?? ''
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')}, and ${items.at(-1)}`
 }

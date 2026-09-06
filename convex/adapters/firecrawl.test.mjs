@@ -3,6 +3,9 @@ import test from 'node:test'
 import {
   firecrawlSearchResults,
   isLikelyProviderSearchResult,
+  localizedProviderQuery,
+  providerSearchResultScore,
+  rankProviderResearchLinks,
 } from './firecrawl.ts'
 
 test('normalizes current Firecrawl v2 web search results', () => {
@@ -48,5 +51,62 @@ test('rejects code repositories and Python configuration results', () => {
       title: 'Local Printer — Event program printing',
     }),
     true,
+  )
+})
+
+test('rejects directories and listicles while ranking relevant official sites', () => {
+  assert.equal(
+    isLikelyProviderSearchResult({
+      url: 'https://www.yelp.com/search?find_desc=printers',
+      title: 'Best printers near Calgary',
+    }),
+    false,
+  )
+  const relevant = providerSearchResultScore({
+    url: 'https://acmeprint.example/services/brochure-printing',
+    title: 'Acme Print — Brochure printing services',
+    description: 'Commercial printing and quote requests in Calgary.',
+    query: 'commercial brochure printer Calgary',
+  })
+  const generic = providerSearchResultScore({
+    url: 'https://acmeprint.example/',
+    title: 'Acme Print',
+    description: 'Welcome to our company.',
+    query: 'commercial brochure printer Calgary',
+  })
+  assert.ok(relevant > generic)
+})
+
+test('selects bounded same-site contact and request-specific research pages', () => {
+  assert.deepEqual(
+    rankProviderResearchLinks({
+      pages: [
+        {
+          url: 'https://printer.example/',
+          title: 'Printer',
+          markdown:
+            '[Contact](/contact) [Brochures](/services/brochure-printing) [Blog](/blog/brochure-trends) [External](https://other.example/contact)',
+        },
+      ],
+      origin: 'https://printer.example',
+      query: 'brochure printing pricing contact',
+      excludedUrls: ['https://printer.example/'],
+      limit: 2,
+    }),
+    [
+      'https://printer.example/contact',
+      'https://printer.example/services/brochure-printing',
+    ],
+  )
+})
+
+test('adds location only when the planned query does not already include it', () => {
+  assert.equal(
+    localizedProviderQuery('commercial printer Calgary', 'Calgary, Alberta'),
+    'commercial printer Calgary',
+  )
+  assert.equal(
+    localizedProviderQuery('commercial brochure printer', 'Calgary, Alberta'),
+    'commercial brochure printer Calgary, Alberta',
   )
 })

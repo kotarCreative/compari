@@ -31,6 +31,19 @@ export type ProviderExtraction = {
   providerQuestion?: string
   confidence: number
 }
+export type OutreachEmail = { subject: string; body: string }
+export type OutreachEmailContext = {
+  originalRequest: string
+  requestTitle: string
+  location?: string
+  buyerName: string
+  providerName: string
+  requirements: Array<{
+    label: string
+    value: string
+    kind: 'hard_constraint' | 'preference' | 'information'
+  }>
+}
 export interface ReasoningPort {
   extractRequirements: (input: {
     prompt: string
@@ -52,6 +65,7 @@ export interface ReasoningPort {
     requirements: Array<ExtractedRequirement>
     answeredQuestions: Array<AnsweredQuestion>
   }) => Promise<ProviderSearchPlan>
+  composeOutreachEmail: (input: OutreachEmailContext) => Promise<OutreachEmail>
   /** The caller supplies provider content inside explicit untrusted delimiters. */
   extractProviderResponse: (input: {
     delimitedBody: string

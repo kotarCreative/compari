@@ -4,6 +4,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
 import { getAgentMailPort } from './adapters/agentMail'
+import { getReasoningPort } from './adapters/reasoning'
 import { classifyExternalError } from './domain/outboundPolicy'
 
 export const execute = internalAction({
@@ -44,11 +45,34 @@ export const execute = internalAction({
       return null
     }
     try {
+      const draft =
+        payload.draft ??
+        (await getReasoningPort().composeOutreachEmail(payload.composition))
+      if (!payload.draft) {
+        const saved = await ctx.runMutation(
+          internal.outreachWorkflowState.saveDraft,
+          {
+            ...args,
+            claimToken: claim.claimToken,
+            subject: draft.subject,
+            body: draft.body,
+          },
+        )
+        if (!saved) {
+          await ctx.runMutation(internal.outreachWorkflowState.block, {
+            ...args,
+            claimToken: claim.claimToken,
+            retryable: false,
+            summary: 'Generated outreach did not pass the final safety check',
+          })
+          return null
+        }
+      }
       const result = await getAgentMailPort().sendMessage({
         inboxId: payload.inboxId,
         to: payload.endpoint,
-        subject: payload.subject,
-        text: payload.body,
+        subject: draft.subject,
+        text: draft.body,
         idempotencyKey: payload.idempotencyKey,
       })
       await ctx.runMutation(internal.outreachWorkflowState.complete, {
@@ -56,8 +80,8 @@ export const execute = internalAction({
         claimToken: claim.claimToken,
         messageId: result.messageId,
         threadId: result.threadId,
-        subject: payload.subject,
-        body: payload.body,
+        subject: draft.subject,
+        body: draft.body,
       })
     } catch (error) {
       const failure = classifyExternalError(error)

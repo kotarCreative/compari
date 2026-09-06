@@ -101,7 +101,7 @@ export const discoverProviders = internalAction({
       const plan = await getReasoningPort().planProviderSearch({
         prompt: request.prompt,
         location: request.location,
-        requirements: request.corrections,
+        requirements: request.requirements,
         answeredQuestions: request.answeredQuestions,
       })
       const resultBatches = []
@@ -111,6 +111,7 @@ export const discoverProviders = internalAction({
           resultBatches.push(
             await getWebResearchPort().searchProviders({
               query,
+              location: request.location,
               limit: 6,
             }),
           )
