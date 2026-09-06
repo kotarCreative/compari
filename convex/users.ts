@@ -82,14 +82,23 @@ export const ensureCurrentUser = mutation({
     if (existing) return existing._id
     const userId = await authUserId(ctx)
     const now = Date.now()
-    await ctx.db.patch('users', userId, {
+    const profile = {
       tokenIdentifier: identity.tokenIdentifier,
       name: identity.name ?? undefined,
       email: identity.email ?? undefined,
       createdAt: now,
       updatedAt: now,
-    })
-    return userId
+    }
+    const authUser = await ctx.db.get('users', userId)
+    if (authUser) {
+      await ctx.db.patch('users', userId, profile)
+      return userId
+    }
+
+    // A development data reset can remove the auth user while its browser
+    // session remains valid. Recreate an application user keyed by the stable
+    // token identifier instead of trapping that session in bootstrap errors.
+    return await ctx.db.insert('users', profile)
   },
 })
 
