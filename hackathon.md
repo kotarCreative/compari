@@ -10,9 +10,9 @@
 - **Components:** none
 - **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, realtime queries
 - **Auth:** Convex Auth
-- **AI models:** gpt-4.1-mini
+- **AI models:** gpt-4.1-mini, gpt-5.6-luna
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-06T15:18:38Z
+- **Last updated:** 2026-09-07T03:42:34Z
 
 ## Log
 
@@ -114,3 +114,13 @@ AgentMail send keys, and exposes retry status in the request view
 (`convex/adapters/firecrawl.ts`, `convex/adapters/reasoning.ts`,
 `convex/outreachWorkflow.ts`, `src/features/request/RequestDetail.tsx`).
 Tests, typecheck, lint, and Convex development validation pass.
+
+### 2026-09-07 - b0896a9
+
+Added saved, editable buyer locations and gave the workspace a notebook-style
+interface with a dedicated new-request route, clearer comparison progress, and
+readable outreach status (`convex/users.ts`, `src/features/workspace/`,
+`src/features/request/`). Vendor email extraction now uses GPT-5.6 Luna with
+strict structured output for canonical price and availability fields, including
+compatibility for existing responses (`convex/adapters/`, `convex/proposals.ts`).
+Tests, typecheck, lint, production build, and Convex development validation pass.
