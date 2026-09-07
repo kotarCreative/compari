@@ -25,6 +25,41 @@ export function normalizeExtractionDto(value: unknown): ExtractionDto | null {
   return { schemaVersion: 1, facts, proposal: { status: proposal.status, summary: proposal.summary.slice(0, 1_500), attributes, missingInformation: proposal.missingInformation.filter((item): item is string => typeof item === 'string').slice(0, 10).map((item) => item.slice(0, 300)) }, providerQuestion, confidence: typeof value.confidence === 'number' && value.confidence >= 0 && value.confidence <= 1 ? value.confidence : 0 }
 }
 
+export function canonicalizeLegacyOfferTerms(value: unknown): unknown {
+  if (!isRecord(value) || Array.isArray(value)) return value
+  const result = { ...value }
+  if (typeof result.price !== 'string') {
+    const prices = matchingStringValues(
+      value,
+      /(^|_)(price|pricing|cost|quote|rate)(_|$)/,
+    )
+    if (prices.length) result.price = prices.join('; ')
+  }
+  if (typeof result.availability !== 'string') {
+    const availability = matchingStringValues(
+      value,
+      /(^|_)(availability|available|appointment|service_date|schedule)(_|$)/,
+    )
+    if (availability.length) result.availability = availability.join('; ')
+  }
+  return result
+}
+
+function matchingStringValues(
+  attributes: Record<string, unknown>,
+  keyPattern: RegExp,
+): Array<string> {
+  return [
+    ...new Set(
+      Object.entries(attributes).flatMap(([key, item]) =>
+        keyPattern.test(key) && typeof item === 'string' && item.trim()
+          ? [item.trim()]
+          : [],
+      ),
+    ),
+  ]
+}
+
 export function answerEligible(input: { hasUserFact: boolean; confidence: number; requestActive: boolean; paused: boolean; answer: string }) {
   return input.hasUserFact && input.confidence >= 0.85 && input.requestActive && !input.paused && !/\b(accept|agree|book|purchase|pay|payment|sign|contract|negotiate|commit)\b/i.test(input.answer)
 }

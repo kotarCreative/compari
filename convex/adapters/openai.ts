@@ -15,6 +15,8 @@ import type { OpenAIResponsesProviderOptions } from '@ai-sdk/openai'
 import type { JSONSchema7 } from 'ai'
 
 type OpenAIOperation = 'reasoning' | 'ranking'
+type ReasoningEffort =
+  'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export async function generateOpenAIStructuredOutput(input: {
   operation: OpenAIOperation
@@ -22,6 +24,8 @@ export async function generateOpenAIStructuredOutput(input: {
   schema: Record<string, unknown>
   system: string
   user: string
+  model?: string
+  reasoningEffort?: ReasoningEffort
 }): Promise<unknown> {
   const apiKey = requireDeploymentEnv(
     'OPENAI_API_KEY',
@@ -31,7 +35,9 @@ export async function generateOpenAIStructuredOutput(input: {
   try {
     const result = await generateText({
       model: openai.responses(
-        deploymentEnv('OPENAI_REASONING_MODEL') ?? 'gpt-4.1-mini',
+        input.model ??
+          deploymentEnv('OPENAI_REASONING_MODEL') ??
+          'gpt-4.1-mini',
       ),
       instructions: input.system,
       prompt: input.user,
@@ -45,6 +51,9 @@ export async function generateOpenAIStructuredOutput(input: {
         openai: {
           store: false,
           strictJsonSchema: true,
+          ...(input.reasoningEffort
+            ? { reasoningEffort: input.reasoningEffort }
+            : {}),
         } satisfies OpenAIResponsesProviderOptions,
       },
     })

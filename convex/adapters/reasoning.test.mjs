@@ -7,7 +7,10 @@ import {
   normalizeProviderSearchPlan,
   normalizeProviderResponse,
 } from './reasoning.ts'
-import { normalizeExtractionDto } from '../domain/reasoning.ts'
+import {
+  canonicalizeLegacyOfferTerms,
+  normalizeExtractionDto,
+} from '../domain/reasoning.ts'
 
 test('deterministic reasoning returns a versioned DTO for canonical demo fixtures', async () => {
   const port = createDeterministicReasoningPort()
@@ -214,4 +217,74 @@ test('provider output converts bounded attribute pairs and rejects unsafe keys',
   })
   assert.deepEqual(output?.proposal.attributes, { price: '$900' })
   assert.equal(output?.providerQuestion, undefined)
+})
+
+test('provider output creates canonical comparison facts from an LLM extraction', () => {
+  const output = normalizeProviderResponse({
+    schemaVersion: 1,
+    price:
+      'Interior cleaning: $210-$230 depending on size; exterior hand wash and dry: $50-$100 depending on condition',
+    availability: 'September 15 at 8 am',
+    facts: [
+      {
+        key: 'interior_cleaning_price_range_suv',
+        label: 'Full Interior Cleaning Price Range for SUV',
+        value: '$210-$230 depending on size',
+        confidence: 0.9,
+      },
+      {
+        key: 'availability_date_time',
+        label: 'Service Availability Date and Time',
+        value: 'September 15 at 8 am',
+        confidence: 0.9,
+      },
+    ],
+    proposal: {
+      status: 'complete',
+      summary: 'The provider supplied pricing and a service time.',
+      attributes: [
+        {
+          key: 'interior_cleaning_price_range_suv',
+          value: '$210-$230 depending on size',
+        },
+        {
+          key: 'availability_date_time',
+          value: 'September 15 at 8 am',
+        },
+      ],
+      missingInformation: [],
+    },
+    providerQuestion: null,
+    confidence: 0.9,
+  })
+
+  assert.equal(
+    output?.facts.find((fact) => fact.key === 'price')?.value,
+    'Interior cleaning: $210-$230 depending on size; exterior hand wash and dry: $50-$100 depending on condition',
+  )
+  assert.equal(
+    output?.facts.find((fact) => fact.key === 'availability')?.value,
+    'September 15 at 8 am',
+  )
+  assert.equal(
+    output?.proposal.attributes.price,
+    'Interior cleaning: $210-$230 depending on size; exterior hand wash and dry: $50-$100 depending on condition',
+  )
+  assert.equal(output?.proposal.attributes.availability, 'September 15 at 8 am')
+})
+
+test('legacy proposal attributes expose canonical comparison terms', () => {
+  const attributes = canonicalizeLegacyOfferTerms({
+    interior_cleaning_price_range_suv: '$210-$230 depending on size',
+    exterior_hand_wash_price_range: '$50-$100 depending on condition',
+    availability_date_time: 'September 15 at 8 am',
+  })
+
+  assert.deepEqual(attributes, {
+    interior_cleaning_price_range_suv: '$210-$230 depending on size',
+    exterior_hand_wash_price_range: '$50-$100 depending on condition',
+    availability_date_time: 'September 15 at 8 am',
+    price: '$210-$230 depending on size; $50-$100 depending on condition',
+    availability: 'September 15 at 8 am',
+  })
 })

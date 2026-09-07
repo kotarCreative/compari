@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { query } from './_generated/server'
+import { canonicalizeLegacyOfferTerms } from './domain/reasoning'
 import { requireOwnedRequest } from './lib/auth'
 
 export const list = query({
@@ -29,7 +30,10 @@ export const list = query({
       summary: proposal.summary,
       confidence: proposal.confidence,
       version: proposal.version,
-      attributes: proposal.attributes,
+      attributes: {
+        ...proposal.attributes,
+        value: canonicalizeLegacyOfferTerms(proposal.attributes.value),
+      },
     }))
   },
 })
