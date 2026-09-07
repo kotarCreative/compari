@@ -86,7 +86,7 @@ export function FirstSearch() {
         </span>
       </div>
       {step === 'name' ? (
-        <section className="welcome-card animate-onboarding-welcome mt-6 space-y-6">
+        <section className="welcome-page animate-onboarding-welcome mt-6 space-y-6">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-3">
               <p className="hand-note text-sky-700">
@@ -121,7 +121,7 @@ export function FirstSearch() {
             <p className="text-xs leading-5 text-slate-500">
               We use your name for your buyer inbox and to sign vendor outreach.
             </p>
-            <Button className="w-full" size="lg" type="submit">
+            <Button className="mt-3" size="lg" type="submit">
               Let’s get started <span aria-hidden="true">→</span>
             </Button>
             {error ? (
@@ -135,7 +135,7 @@ export function FirstSearch() {
           </form>
         </section>
       ) : (
-        <section className="welcome-card mt-6 space-y-8">
+        <section className="welcome-page mt-6 space-y-8">
           <div className="animate-onboarding-welcome space-y-2">
             <p className="text-sm text-slate-500">Nice to meet you.</p>
             <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
@@ -170,7 +170,10 @@ export function FirstSearch() {
                 value={prompt}
               />
             </div>
-            <div className="flex flex-wrap gap-2" aria-label="Example requests">
+            <div
+              className="flex flex-col items-start gap-1"
+              aria-label="Example requests"
+            >
               {[
                 'Find a wedding photographer in Calgary',
                 'Compare office cleaning services for a small team',
@@ -187,7 +190,7 @@ export function FirstSearch() {
               ))}
             </div>
             <Button
-              className="w-full"
+              className="mt-2"
               disabled={prompt.trim().length < 12}
               size="lg"
               type="submit"
@@ -195,7 +198,7 @@ export function FirstSearch() {
               Find my options <span aria-hidden="true">↗</span>
             </Button>
             <button
-              className="text-sm text-slate-500 underline underline-offset-4"
+              className="block min-h-11 marker-button font-hand text-2xl font-bold text-slate-600 px-2"
               onClick={() => setStep('name')}
               type="button"
             >

@@ -49,7 +49,7 @@ export function RequestConversation({
   return (
     <section className="mx-auto w-full max-w-2xl space-y-4">
       <div className="flex justify-end">
-        <p className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-sky-600 px-4 py-3 text-sm leading-6 text-white shadow-sm">
+        <p className="max-w-[88%] whitespace-pre-wrap bg-sky-100/40 px-4 py-3 text-sm leading-6 text-slate-800">
           {prompt}
         </p>
       </div>
@@ -58,7 +58,7 @@ export function RequestConversation({
         <div className="space-y-3" key={item.id}>
           <QuestionBubble question={item} />
           <div className="flex justify-end">
-            <p className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-sky-600 px-4 py-3 text-sm leading-6 text-white shadow-sm">
+            <p className="max-w-[88%] whitespace-pre-wrap bg-sky-100/40 px-4 py-3 text-sm leading-6 text-slate-800">
               {item.answer}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function RequestConversation({
           </form>
         </div>
       ) : loaderPhase ? (
-        <div className="animate-onboarding-welcome rounded-2xl border border-sky-100 bg-white/70 p-5 dark:border-slate-800 dark:bg-slate-900/70">
+        <div className="animate-onboarding-welcome pl-5 py-2">
           <ResearchLoader />
           <div
             aria-live="polite"
@@ -157,7 +157,7 @@ function QuestionBubble({
 }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[88%] rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="max-w-[88%] px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
           {question.importance === 'required'
             ? 'One detail needed'

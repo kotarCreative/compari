@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { DecisionPanel } from '../decision/DecisionPanel'
 import { RequestConversation } from '../workspace/RequestConversation'
 import { productApi } from './contracts'
+import { AgentProgress } from './components/AgentProgress'
+import { OutreachStatus } from './components/OutreachStatus'
 import type { RequestDetailValue as Detail } from './contracts'
 import { errorMessage } from '~/lib/errors'
 import { Alert, Button } from '~/components/ui'
@@ -34,7 +36,7 @@ export function RequestDetail({
 
   if (detail === undefined)
     return (
-      <section className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-800">
+      <section className="mt-8 pt-8 dark:border-slate-800">
         <RequestConversation
           loaderPhase="interpreting"
           prompt={requestPrompt}
@@ -54,39 +56,44 @@ export function RequestDetail({
   }
 
   return (
-    <section className="mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold tracking-[.16em] text-sky-700 dark:text-sky-300">
-            ACTIVE COMPARISON
-          </p>
-          <h2 className="mt-1 text-2xl font-bold">{detail.request.title}</h2>
+    <section className="mt-8 space-y-12 py-4">
+      <header className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-[.16em] text-sky-700 dark:text-sky-300">
+              ACTIVE COMPARISON
+            </p>
+            <h2 className="mt-1 text-2xl font-bold">{detail.request.title}</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={onClose} size="sm" variant="outline">
+              All requests
+            </Button>
+            <Button
+              onClick={() =>
+                run(
+                  detail.request.automationPaused
+                    ? resume({ requestId })
+                    : pause({ requestId }),
+                )
+              }
+              size="sm"
+              variant="outline"
+            >
+              {detail.request.automationPaused
+                ? 'Resume agents'
+                : 'Pause agents'}
+            </Button>
+            <Button
+              onClick={() => run(cancel({ requestId }))}
+              size="sm"
+              variant="ghost"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={onClose} size="sm" variant="outline">
-            All requests
-          </Button>
-          <Button
-            onClick={() =>
-              run(
-                detail.request.automationPaused
-                  ? resume({ requestId })
-                  : pause({ requestId }),
-              )
-            }
-            size="sm"
-            variant="outline"
-          >
-            {detail.request.automationPaused ? 'Resume agents' : 'Pause agents'}
-          </Button>
-          <Button
-            onClick={() => run(cancel({ requestId }))}
-            size="sm"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-        </div>
+        <AgentProgress detail={detail} />
       </header>
 
       {error ? <Alert variant="destructive">{error}</Alert> : null}
@@ -131,7 +138,6 @@ export function RequestDetail({
         />
       ) : (
         <div className="space-y-6">
-          <AgentProgress detail={detail} />
           <Options
             detail={detail}
             onError={setError}
@@ -153,90 +159,6 @@ export function RequestDetail({
   )
 }
 
-function AgentProgress({ detail }: { detail: Detail }) {
-  const order = [
-    'draft',
-    'researching',
-    'contacting',
-    'collecting_responses',
-    'evaluating',
-    'awaiting_selection',
-    'completed',
-  ]
-  const current = Math.max(order.indexOf(detail.request.status), 0)
-  const agents = [
-    {
-      name: 'Research agent',
-      detail: `${detail.request.candidateCounts.discovered} options found`,
-      startsAt: 1,
-      endsAt: 1,
-    },
-    {
-      name: 'Outreach agent',
-      detail: `${detail.request.candidateCounts.contacted} contacted · ${detail.request.candidateCounts.responded} replied`,
-      startsAt: 2,
-      endsAt: 3,
-    },
-    {
-      name: 'Comparison agent',
-      detail:
-        detail.request.status === 'awaiting_selection'
-          ? 'Ready for your choice'
-          : 'Preparing your options',
-      startsAt: 4,
-      endsAt: 4,
-    },
-  ]
-
-  return (
-    <section aria-labelledby="agent-progress-heading">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold" id="agent-progress-heading">
-          Agent progress
-        </h3>
-        {detail.request.automationPaused ? (
-          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-            Paused
-          </span>
-        ) : null}
-      </div>
-      <ol className="mt-3 grid gap-2 sm:grid-cols-3">
-        {agents.map((agent) => {
-          const state =
-            current < agent.startsAt
-              ? 'Waiting'
-              : current <= agent.endsAt
-                ? 'Working'
-                : 'Done'
-          return (
-            <li
-              className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3 dark:bg-slate-900"
-              key={agent.name}
-            >
-              <span
-                aria-hidden="true"
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                  state === 'Working'
-                    ? 'animate-pulse bg-sky-500'
-                    : state === 'Done'
-                      ? 'bg-emerald-500'
-                      : 'bg-slate-300 dark:bg-slate-700'
-                }`}
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{agent.name}</p>
-                <p className="truncate text-xs text-slate-500">
-                  {state} · {agent.detail}
-                </p>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
-  )
-}
-
 function Options({
   detail,
   onError,
@@ -253,9 +175,6 @@ function Options({
 }) {
   const [selected, setSelected] = useState<Array<string>>([])
   const [isContacting, setIsContacting] = useState(false)
-  const [retryingAttemptId, setRetryingAttemptId] = useState<string | null>(
-    null,
-  )
   const options = detail.candidates.filter(
     (candidate) =>
       candidate.recommendationStatus === 'recommended' ||
@@ -288,7 +207,7 @@ function Options({
       </div>
 
       {options.length ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-4">
           {options.map((candidate) => {
             const selectedForContact =
               candidate.recommendationStatus === 'selected'
@@ -301,10 +220,10 @@ function Options({
             const checked = selected.includes(candidate._id)
             return (
               <label
-                className={`cursor-pointer rounded-xl border p-4 transition ${
-                  checked
-                    ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-950/40'
-                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-800'
+                className={`option-row cursor-pointer px-4 py-5 transition-colors ${
+                  checked || selectedForContact
+                    ? 'bg-sky-100/40'
+                    : 'hover:bg-slate-100/40'
                 }`}
                 key={candidate._id}
               >
@@ -312,7 +231,7 @@ function Options({
                   <input
                     aria-label={`Select ${candidate.name}`}
                     checked={checked || selectedForContact}
-                    className="mt-1"
+                    className="ink-checkbox mt-1"
                     disabled={selectedForContact || !hasEmail || isContacting}
                     onChange={() => toggle(candidate._id)}
                     type="checkbox"
@@ -344,7 +263,7 @@ function Options({
           })}
         </div>
       ) : (
-        <div className="mt-3 rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center dark:border-slate-700">
+        <div className="mt-3 py-8 text-center">
           <p className="font-medium">
             {rankingReady
               ? 'No suitable options yet'
@@ -390,60 +309,11 @@ function Options({
         </div>
       ) : null}
 
-      {detail.outreach.length ? (
-        <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-          <h4 className="text-sm font-semibold">Outreach status</h4>
-          {detail.outreach.map((attempt) => {
-            const candidate = detail.candidates.find(
-              (item) => item._id === attempt.candidateId,
-            )
-            const isRetryable =
-              attempt.status === 'retryable_failure' ||
-              (attempt.status === 'needs_user' &&
-                attempt.safeError?.includes('Idempotency-Key') === true &&
-                attempt.safeError.includes('invalid_format'))
-            return (
-              <div
-                className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                key={attempt._id}
-              >
-                <div>
-                  <p className="font-medium">
-                    {candidate?.name ?? 'Provider'} · {attempt.status}
-                  </p>
-                  {attempt.safeError ? (
-                    <p className="text-xs text-red-600 dark:text-red-400">
-                      {attempt.safeError}
-                    </p>
-                  ) : null}
-                </div>
-                {isRetryable ? (
-                  <Button
-                    disabled={retryingAttemptId === attempt._id}
-                    onClick={() => {
-                      onError(null)
-                      setRetryingAttemptId(attempt._id)
-                      void retryFailed({ attemptId: attempt._id })
-                        .catch((reason) =>
-                          onError(
-                            errorMessage(reason, 'Could not retry outreach.'),
-                          ),
-                        )
-                        .finally(() => setRetryingAttemptId(null))
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {retryingAttemptId === attempt._id
-                      ? 'Retrying…'
-                      : 'Retry contact'}
-                  </Button>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
+      <OutreachStatus
+        detail={detail}
+        onError={onError}
+        retryFailed={retryFailed}
+      />
     </section>
   )
 }

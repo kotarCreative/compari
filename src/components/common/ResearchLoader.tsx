@@ -28,7 +28,7 @@ export function LoadingCards({
         <div
           key={item}
           aria-hidden="true"
-          className="loading-card rounded-2xl border border-slate-200/70 bg-white/60 p-5 dark:border-slate-800 dark:bg-slate-900/60"
+          className="loading-card py-5"
           style={{ animationDelay: `${item * 120}ms` }}
         >
           <div className="skeleton mb-3 h-4 w-2/5 rounded-full" />

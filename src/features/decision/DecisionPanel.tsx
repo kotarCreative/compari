@@ -28,7 +28,7 @@ export function DecisionPanel({
   const received =
     proposals?.filter((proposal) => proposal.status === 'received') ?? []
   return (
-    <section className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+    <section className="space-y-6 pt-8">
       <div>
         <h3 className="text-lg font-semibold">Compare your options</h3>
         <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -38,7 +38,7 @@ export function DecisionPanel({
       </div>
       <ViewRenderer views={data.views} />
       {status === 'awaiting_selection' ? (
-        <div className="space-y-3 rounded-xl border border-sky-300 p-4 text-sm">
+        <div className="space-y-3 pl-4 py-4 text-sm">
           <strong>Make your choice</strong>
           {received.length ? (
             received.map((proposal) => (
@@ -89,7 +89,7 @@ function ConfirmationCard({
       ? String(attributes[key])
       : 'Not supplied'
   return (
-    <article className="rounded border border-slate-200 p-3 dark:border-slate-700">
+    <article className="py-4">
       <h5 className="font-semibold">
         {provider?.name ?? 'Provider'} · current proposal v{proposal.version}
       </h5>

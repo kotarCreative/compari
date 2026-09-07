@@ -44,7 +44,7 @@ function TrustedView({ view }: { view: View }) {
   switch (view.viewType) {
     case 'recommendation':
       return (
-        <article className="rounded border border-sky-300 bg-sky-50 p-3 dark:bg-slate-950">
+        <article className="pl-4 py-3">
           {heading}
           {note}
           <p className="mt-3 text-xs font-semibold text-sky-800 dark:text-sky-200">
@@ -55,16 +55,13 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'provider_cards':
       return (
-        <article className="rounded border p-3">
+        <article className="py-4">
           {heading}
           {note}
           <div className="mt-3 grid gap-2">
             {providerLabels.length ? (
               providerLabels.map((provider) => (
-                <div
-                  className="rounded bg-slate-50 p-2 text-xs dark:bg-slate-900"
-                  key={provider}
-                >
+                <div className="py-2 text-xs" key={provider}>
                   {provider}
                   <span className="ml-2 text-slate-500">
                     Evidence available for review
@@ -79,7 +76,7 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'comparison_matrix':
       return (
-        <article className="overflow-auto rounded border p-3">
+        <article className="overflow-auto py-4">
           {heading}
           {note}
           <table className="mt-3 w-full text-left text-xs">
@@ -96,7 +93,7 @@ function TrustedView({ view }: { view: View }) {
             <tbody>
               {metrics.length ? (
                 metrics.map((metric) => (
-                  <tr className="border-t" key={metric}>
+                  <tr className="even:bg-sky-100/25" key={metric}>
                     <th className="py-1 pr-3 font-medium">
                       {humanize(metric)}
                     </th>
@@ -123,7 +120,7 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'ranking':
       return (
-        <article className="rounded border p-3">
+        <article className="py-4">
           {heading}
           {note}
           <ol className="mt-3 space-y-1 text-xs">
@@ -145,16 +142,13 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'bar':
       return (
-        <article className="rounded border p-3">
+        <article className="py-4">
           {heading}
           {note}
           <div className="mt-3 space-y-2">
             {metrics.length ? (
               metrics.map((metric) => (
-                <div
-                  className="rounded bg-slate-50 p-2 text-xs dark:bg-slate-900"
-                  key={metric}
-                >
+                <div className="py-2 text-xs" key={metric}>
                   <strong>{humanize(metric)}</strong>
                   <span className="ml-2 text-slate-500">
                     Open provider evidence to compare values.
@@ -169,10 +163,10 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'timeline':
       return (
-        <article className="rounded border p-3">
+        <article className="py-4">
           {heading}
           {note}
-          <ol className="mt-3 border-l-2 border-slate-300 pl-3 text-xs dark:border-slate-600">
+          <ol className="mt-3 pl-3 text-xs dark:border-slate-600">
             <li className="pb-2">
               <strong>Research</strong>
               <span className="ml-2 text-slate-500">public facts retained</span>
@@ -192,17 +186,17 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'difference':
       return (
-        <article className="rounded border p-3">
+        <article className="py-4">
           {heading}
           {note}
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded bg-slate-50 p-2 dark:bg-slate-900">
+            <div className="pl-3">
               <strong>{providerLabels[0] ?? 'Provider A'}</strong>
               <p className="mt-1 text-slate-500">
                 Review its retained facts and terms.
               </p>
             </div>
-            <div className="rounded bg-slate-50 p-2 dark:bg-slate-900">
+            <div className="pl-3">
               <strong>{providerLabels[1] ?? 'Provider B'}</strong>
               <p className="mt-1 text-slate-500">
                 Review its retained facts and terms.
@@ -213,7 +207,7 @@ function TrustedView({ view }: { view: View }) {
       )
     case 'missing_information':
       return (
-        <article className="rounded border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/30">
+        <article className="pl-4 py-3">
           {heading}
           {note}
           <ul className="mt-3 list-disc space-y-1 pl-4 text-xs">
@@ -227,7 +221,7 @@ function TrustedView({ view }: { view: View }) {
       )
     default:
       return (
-        <article className="rounded border border-amber-300 p-3 text-sm">
+        <article className="pl-4 py-3 text-sm">
           <h5 className="font-semibold">Unsupported comparison lens</h5>
           <p className="mt-1 text-slate-600 dark:text-slate-300">
             This unrecognized view was not rendered. Review the underlying

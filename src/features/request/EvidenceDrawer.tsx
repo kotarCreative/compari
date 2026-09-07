@@ -46,9 +46,7 @@ export function EvidenceDrawer({
             {displayEvidenceValue(evidence.value)}
           </pre>
           {evidence.excerpt ? (
-            <p className="rounded border-l-2 border-sky-400 pl-2 text-xs">
-              {evidence.excerpt}
-            </p>
+            <p className="rounded pl-2 text-xs">{evidence.excerpt}</p>
           ) : (
             <p className="text-xs text-slate-500">
               No excerpt was retained for this evidence.

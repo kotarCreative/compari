@@ -154,24 +154,8 @@
 }
 
 @layer components {
-  .welcome-card {
-    @apply p-6 sm:p-10;
-    position: relative;
-    border: 2px solid #514638;
-    border-radius: 5px 12px 8px 16px;
-    background: #fffdf7;
-    box-shadow: 6px 7px 0 #e2d6bc;
-  }
-  .welcome-card::before {
-    content: '';
-    position: absolute;
-    width: 90px;
-    height: 25px;
-    top: -14px;
-    left: calc(50% - 45px);
-    background: #eccbacb3;
-    transform: rotate(-4deg);
-    border-inline: 2px dotted #fffdf780;
+  .welcome-page {
+    padding-block: 1.5rem;
   }
   .brand-wordmark {
     font-family: var(--font-hand);
@@ -189,12 +173,111 @@
     font-family: var(--font-hand);
     font-size: 1.4rem;
   }
-  .paper-card {
-    border-radius: 6px 12px 7px 10px;
-    border: 1.5px solid #c4b59e;
-    background: #fffdf7;
-    box-shadow: 3px 4px 0 #e8decb;
+  .notebook-section {
+    padding-block: 1.5rem;
   }
+  /* Group notes through breathing room, without enclosing or dividing them. */
+  .notebook-section + .notebook-section {
+    margin-top: 1.5rem;
+  }
+  .request-notes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    align-items: stretch;
+    gap: 2rem;
+    padding-block: 0.5rem 1.5rem;
+  }
+  .request-notes > .sticky-note {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+    padding: 1.75rem 1.5rem 1.5rem;
+    border-radius: 2px 3px 14px 3px / 3px 2px 5px 2px;
+    background: linear-gradient(175deg, #e9ca6825, transparent 22%), #fff0ad;
+    box-shadow:
+      1px 5px 7px -4px #51463838,
+      0 15px 18px -16px #51463850;
+  }
+  .request-notes > .sticky-note:nth-child(3n + 2) {
+    background: linear-gradient(175deg, #d9916525, transparent 22%), #f9dcc6;
+    border-radius: 3px 2px 4px 12px / 2px 3px 2px 5px;
+  }
+  .request-notes > .sticky-note:nth-child(3n + 3) {
+    background: linear-gradient(175deg, #93ab7125, transparent 22%), #e5edcc;
+  }
+  .sticky-note .marker-button {
+    --button-highlight: #fffdf7;
+  }
+
+  .option-row {
+    border-radius: 8px 16px 12px 6px / 12px 8px 14px 10px;
+  }
+  .option-row:has(input:focus-visible) {
+    background-color: #ffedb460;
+  }
+
+  .marker-button {
+    position: relative;
+    isolation: isolate;
+    --button-highlight: #f7d984;
+  }
+  .marker-button::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 24% 0 16%;
+    border-radius: 5px 8px 4px 7px / 7px 4px 8px 5px;
+    background: var(--button-highlight);
+    opacity: 0;
+    transform: rotate(-1deg) scaleX(0.92);
+    transition:
+      opacity 150ms ease,
+      transform 150ms ease;
+    pointer-events: none;
+  }
+  .marker-button:hover:not(:disabled)::before,
+  .marker-button:focus-visible::before,
+  .marker-button:active:not(:disabled)::before {
+    opacity: 0.65;
+    transform: rotate(-1deg) scaleX(1);
+  }
+
+  .ink-checkbox {
+    appearance: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    border: 3px solid #615344;
+    border-radius: 4px 6px 3px 5px / 5px 3px 6px 4px;
+    background-color: #fffcf4;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 22px;
+    cursor: pointer;
+    transition:
+      background-color 150ms,
+      border-color 150ms;
+  }
+  .ink-checkbox:checked {
+    border-color: #80502a;
+    background-color: #f7d984;
+    background-image: url('/illustrations/ink-check.svg');
+  }
+  .ink-checkbox:hover:not(:disabled) {
+    border-color: #352e28;
+    background-color: #ffedb4;
+  }
+  .ink-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .ink-checkbox:focus-visible {
+    outline: 2px dashed #80502a;
+    outline-offset: 4px;
+  }
+
   .paper-input {
     border: 1.5px solid #a59680;
     border-radius: 5px 8px 6px 9px;
@@ -220,7 +303,7 @@
     @apply bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200;
   }
   .suggestion-chip {
-    @apply rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-5 text-slate-600 transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800;
+    @apply py-2 text-left text-sm leading-5 text-slate-600 underline decoration-slate-300 decoration-dashed underline-offset-4 transition-colors hover:text-sky-800 hover:decoration-sky-600;
   }
   .research-loader {
     position: relative;
@@ -326,5 +409,12 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ink-checkbox {
+    appearance: auto;
+    background-image: none;
   }
 }

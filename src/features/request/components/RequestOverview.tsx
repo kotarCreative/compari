@@ -59,7 +59,7 @@ export function ResearchSummary({ detail }: { detail: RequestDetailValue }) {
         : 'Research and contact progress updates here in realtime.'
 
   return (
-    <section className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+    <section className="py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold">Live comparison progress</h3>
         <StatusBadge status={detail.request.status} />
