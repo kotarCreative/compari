@@ -21,11 +21,6 @@ export const confirmChoice = mutation({
     const inputVersion = request.evaluationInputVersion ?? request.version
     const evaluation = await ctx.db.query('evaluations').withIndex('by_request_id_and_input_version', (q) => q.eq('requestId', request._id).eq('inputVersion', inputVersion)).unique()
     if (!evaluation) throw new Error('validation: a current comparison is required before selection')
-    const requirements = await ctx.db.query('requirements').withIndex('by_request_id', (q) => q.eq('requestId', request._id)).take(100)
-    const attributes = proposal.attributes.value
-    const isRecord = typeof attributes === 'object' && attributes !== null
-    const missingHardConstraint = requirements.some((requirement) => requirement.kind === 'hard_constraint' && (!isRecord || !(requirement.key in (attributes as Record<string, unknown>))))
-    if (missingHardConstraint) throw new Error('validation: this offer is missing a required hard-constraint field')
     const now = Date.now()
     transitionRequest('awaiting_selection', 'completed')
     await ctx.db.patch('procurementRequests', request._id, { status: 'completed', selectedCandidateId: candidate._id, selectedProposalId: proposal._id, selectedAt: now, updatedAt: now })

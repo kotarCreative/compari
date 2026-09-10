@@ -7,6 +7,7 @@ import type {
   DecisionProvider as Provider,
 } from './contracts'
 import { Alert, Button } from '~/components/ui'
+import { errorMessage } from '~/lib/errors'
 
 export function DecisionPanel({
   requestId,
@@ -123,8 +124,8 @@ function ConfirmationCard({
             candidateId: proposal.candidateId,
             proposalId: proposal._id,
             proposalVersion: proposal.version,
-          }).catch(() =>
-            onError('This option changed; review the latest proposal.'),
+          }).catch((reason) =>
+            onError(errorMessage(reason, 'This option could not be selected.')),
           )
         }
         size="sm"
