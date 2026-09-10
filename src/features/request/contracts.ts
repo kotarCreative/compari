@@ -55,6 +55,7 @@ export type RequestDetailValue = {
     shortlistReason?: string
     recommendationStatus?: string
     recommendationScore?: number
+    shortlistRank?: number
     recommendationReason?: string
     recommendationCaveats?: Array<string>
     endpoints: Array<{

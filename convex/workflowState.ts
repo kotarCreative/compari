@@ -650,7 +650,12 @@ export const loadCandidateForJob = internalQuery({
   },
   returns: v.union(
     v.null(),
-    v.object({ website: v.string(), vendorDetailQuery: v.string() }),
+    v.object({
+      website: v.string(),
+      vendorDetailQuery: v.string(),
+      prompt: v.string(),
+      requirements: v.array(v.object({ label: v.string(), value: v.string() })),
+    }),
   ),
   handler: async (ctx, args) => {
     const candidate = await ctx.db.get('requestCandidates', args.candidateId)
@@ -674,8 +679,17 @@ export const loadCandidateForJob = internalQuery({
       request.version !== candidate.inputVersion
     )
       return null
+    const requirements = await ctx.db
+      .query('requirements')
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+      .take(30)
     return {
       website: business.website,
+      prompt: request.prompt.slice(0, 4_000),
+      requirements: requirements.map((item) => ({
+        label: item.label.slice(0, 160),
+        value: JSON.stringify(item.value.value).slice(0, 1_000),
+      })),
       vendorDetailQuery:
         request.searchPlanVersion === request.version &&
         request.vendorDetailQuery
@@ -694,6 +708,25 @@ export const recordCandidateResearch = internalMutation({
         url: v.string(),
         title: v.optional(v.string()),
         markdown: v.string(),
+      }),
+    ),
+    websiteQuote: v.optional(
+      v.object({
+        price: v.string(),
+        pricingType: v.union(
+          v.literal('exact'),
+          v.literal('range'),
+          v.literal('starting_at'),
+          v.literal('rate'),
+          v.literal('package'),
+          v.literal('estimate'),
+        ),
+        scope: v.optional(v.string()),
+        conditions: v.optional(v.string()),
+        missingInformation: v.array(v.string()),
+        sourceUrl: v.string(),
+        excerpt: v.string(),
+        confidence: v.number(),
       }),
     ),
   },
@@ -732,7 +765,12 @@ export const recordCandidateResearch = internalMutation({
     await ctx.db.patch('requestCandidates', candidate._id, {
       status: args.pages.length ? 'qualified' : 'rejected',
       qualificationSummary: args.pages.length
-        ? 'Website researched; awaiting provider response for final comparison.'
+        ? args.websiteQuote
+          ? `Published website pricing found: ${args.websiteQuote.price}`.slice(
+              0,
+              500,
+            )
+          : 'Website researched; follow-up may be useful for pricing or other missing details.'
         : undefined,
       rejectionSummary: args.pages.length
         ? undefined
@@ -761,6 +799,61 @@ export const recordCandidateResearch = internalMutation({
         observedAt: now,
         createdAt: now,
       })
+    if (args.websiteQuote) {
+      await ctx.db.insert('facts', {
+        requestId: request._id,
+        candidateId: candidate._id,
+        businessId: business._id,
+        key: 'price',
+        label: 'Published website price',
+        value: { schemaVersion: 1, value: args.websiteQuote.price },
+        sourceType: 'website',
+        sourceReference: {
+          url: args.websiteQuote.sourceUrl,
+          excerpt: args.websiteQuote.excerpt,
+        },
+        confidence: args.websiteQuote.confidence,
+        observedAt: now,
+        createdAt: now,
+      })
+      const previous = await ctx.db
+        .query('proposals')
+        .withIndex('by_candidate_id_and_version', (q) =>
+          q.eq('candidateId', candidate._id),
+        )
+        .order('desc')
+        .first()
+      if (previous && previous.status !== 'superseded')
+        await ctx.db.patch('proposals', previous._id, {
+          status: 'superseded',
+          updatedAt: now,
+        })
+      await ctx.db.insert('proposals', {
+        requestId: request._id,
+        candidateId: candidate._id,
+        status: 'received',
+        summary: websiteQuoteSummary(business.canonicalName, args.websiteQuote),
+        attributes: {
+          schemaVersion: 1,
+          value: {
+            price: args.websiteQuote.price,
+            ...(args.websiteQuote.scope
+              ? { scope: args.websiteQuote.scope }
+              : {}),
+            ...(args.websiteQuote.conditions
+              ? { conditions: args.websiteQuote.conditions }
+              : {}),
+            pricing_type: args.websiteQuote.pricingType,
+            evidence_source: 'Public website',
+            missingInformation: args.websiteQuote.missingInformation,
+          },
+        },
+        confidence: args.websiteQuote.confidence,
+        version: (previous?.version ?? 0) + 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
     const endpoints = extractPublicEndpoints(args.pages)
     for (const extracted of endpoints) {
       const endpoint = await ctx.db
@@ -817,7 +910,9 @@ export const recordCandidateResearch = internalMutation({
         ? 'candidate_qualified'
         : 'candidate_rejected',
       safeMessage: args.pages.length
-        ? `${business.canonicalName} was researched with evidence and awaits buyer shortlist selection.`
+        ? args.websiteQuote
+          ? `${business.canonicalName} published pricing that was retained as a website-sourced option.`
+          : `${business.canonicalName} was researched with evidence; follow-up remains available for missing details.`
         : `${business.canonicalName} could not be researched.`,
       correlationId: String(job._id),
       createdAt: now,
@@ -830,6 +925,31 @@ export const recordCandidateResearch = internalMutation({
     return null
   },
 })
+
+function websiteQuoteSummary(
+  providerName: string,
+  quote: {
+    price: string
+    pricingType: string
+    scope?: string
+    conditions?: string
+  },
+): string {
+  const basis =
+    quote.pricingType === 'exact'
+      ? 'an exact published price'
+      : quote.pricingType === 'starting_at'
+        ? 'a published starting price'
+        : quote.pricingType === 'rate'
+          ? 'a published rate'
+          : quote.pricingType === 'range'
+            ? 'a published price range'
+            : 'published pricing'
+  return `${providerName} lists ${basis} of ${quote.price}${quote.scope ? ` for ${quote.scope}` : ''}${quote.conditions ? `. Conditions: ${quote.conditions}` : ''}.`.slice(
+    0,
+    1_500,
+  )
+}
 export const failCandidateResearch = internalMutation({
   args: {
     candidateId: v.id('requestCandidates'),

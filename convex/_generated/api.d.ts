@@ -33,6 +33,7 @@ import type * as domain_reasoning from "../domain/reasoning.js";
 import type * as domain_researchEndpoints from "../domain/researchEndpoints.js";
 import type * as domain_sideEffectPolicy from "../domain/sideEffectPolicy.js";
 import type * as domain_webhook from "../domain/webhook.js";
+import type * as domain_websitePricing from "../domain/websitePricing.js";
 import type * as domain_workflowState from "../domain/workflowState.js";
 import type * as evaluations from "../evaluations.js";
 import type * as evaluationsWorkflow from "../evaluationsWorkflow.js";
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   "domain/researchEndpoints": typeof domain_researchEndpoints;
   "domain/sideEffectPolicy": typeof domain_sideEffectPolicy;
   "domain/webhook": typeof domain_webhook;
+  "domain/websitePricing": typeof domain_websitePricing;
   "domain/workflowState": typeof domain_workflowState;
   evaluations: typeof evaluations;
   evaluationsWorkflow: typeof evaluationsWorkflow;

@@ -419,12 +419,12 @@ export function rankProviderResearchLinks(input: {
   const tokens = meaningfulTokens(input.query)
   for (const page of input.pages) {
     const links = page.markdown.matchAll(
-      /\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+      /\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
     )
     for (const match of links) {
       let linked: URL
       try {
-        linked = new URL(match[1], page.url)
+        linked = new URL(match[2], page.url)
       } catch {
         continue
       }
@@ -437,23 +437,33 @@ export function rankProviderResearchLinks(input: {
       linked.hash = ''
       const canonical = canonicalResearchUrl(linked.toString())
       const path = linked.pathname.toLowerCase()
+      const linkLabel = match[1].toLowerCase()
+      const linkIntent = `${path} ${linkLabel}`
+      const isPricingResource =
+        /\b(?:costs?|fees?|menu|packages?|plans?|prices?|pricing|rates?)\b/.test(
+          linkIntent,
+        )
       if (
         excluded.has(canonical) ||
         /\/(?:account|blog|careers?|legal|login|news|privacy|terms)(?:\/|$)/.test(
           path,
         ) ||
-        /\.(?:docx?|jpe?g|pdf|png|svg|webp)$/i.test(path)
+        /\.(?:docx?|jpe?g|png|svg|webp)$/i.test(path) ||
+        (/\.pdf$/i.test(path) && !isPricingResource)
       )
         continue
       let score = 0
-      if (/\/(?:contact|estimate|quote|request)(?:\/|$)/.test(path)) score += 10
+      // Published pricing is more useful than a contact route because it can
+      // produce an immediate, evidence-backed option without outreach.
+      if (isPricingResource) score += 20
       if (
         /\/(?:about|capabilities|pricing|products?|services?)(?:\/|$)/.test(
           path,
         )
       )
-        score += 5
-      for (const token of tokens) if (path.includes(token)) score += 2
+        score += 8
+      if (/\/(?:contact|estimate|quote|request)(?:\/|$)/.test(path)) score += 4
+      for (const token of tokens) if (linkIntent.includes(token)) score += 2
       if (score > 0)
         scores.set(canonical, Math.max(scores.get(canonical) ?? 0, score))
     }

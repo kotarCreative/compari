@@ -94,8 +94,30 @@ test('selects bounded same-site contact and request-specific research pages', ()
       limit: 2,
     }),
     [
-      'https://printer.example/contact',
       'https://printer.example/services/brochure-printing',
+      'https://printer.example/contact',
+    ],
+  )
+})
+
+test('prioritizes pricing links and pricing PDFs ahead of contact forms', () => {
+  assert.deepEqual(
+    rankProviderResearchLinks({
+      pages: [
+        {
+          url: 'https://cleaner.example/',
+          markdown:
+            '[Contact us](/contact) [Our rates](/details) [Price list PDF](/downloads/service-pricing.pdf) [Terms PDF](/terms.pdf)',
+        },
+      ],
+      origin: 'https://cleaner.example',
+      query: 'home cleaning price quote',
+      limit: 3,
+    }),
+    [
+      'https://cleaner.example/downloads/service-pricing.pdf',
+      'https://cleaner.example/details',
+      'https://cleaner.example/contact',
     ],
   )
 })

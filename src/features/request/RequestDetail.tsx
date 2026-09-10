@@ -5,7 +5,7 @@ import { RequestConversation } from '../workspace/RequestConversation'
 import { productApi } from './contracts'
 import { AgentProgress } from './components/AgentProgress'
 import { OutreachStatus } from './components/OutreachStatus'
-import { safeEvidenceUrl } from './evidencePolicy'
+import { displayEvidenceValue, safeEvidenceUrl } from './evidencePolicy'
 import type { RequestDetailValue as Detail } from './contracts'
 import { errorMessage } from '~/lib/errors'
 import { Alert, Button } from '~/components/ui'
@@ -182,6 +182,9 @@ function Options({
       candidate.recommendationStatus === 'selected',
   )
   const rankingReady = detail.request.rankingStatus === 'ready'
+  const canFollowUp = ['researching', 'awaiting_selection'].includes(
+    detail.request.status,
+  )
   const toggle = (id: string) =>
     setSelected((current) =>
       current.includes(id)
@@ -199,7 +202,8 @@ function Options({
             Your options
           </h3>
           <p className="text-sm text-slate-500">
-            Choose who you want the agents to contact.
+            Published website prices are shown first. Follow up only when you
+            want missing details confirmed.
           </p>
         </div>
         {options.length ? (
@@ -220,6 +224,9 @@ function Options({
             )
             const checked = selected.includes(candidate._id)
             const websiteUrl = safeEvidenceUrl(candidate.website)
+            const websitePrice = candidate.facts.find(
+              (fact) => fact.key === 'price' && fact.sourceType === 'website',
+            )
             return (
               <div
                 className={`option-row cursor-pointer px-4 py-5 transition-colors ${
@@ -257,10 +264,12 @@ function Options({
                     </p>
                     <p className="mt-2 text-xs text-slate-500">
                       {selectedForContact
-                        ? 'Contact in progress'
-                        : hasEmail
-                          ? 'Ready to contact'
-                          : 'Waiting for a contact method'}
+                        ? 'Follow-up in progress'
+                        : websitePrice
+                          ? `Website price: ${displayEvidenceValue(websitePrice.value.value)}`
+                          : hasEmail
+                            ? 'No public price found · follow-up available'
+                            : 'No public price or email follow-up found'}
                     </p>
                   </div>
                 </label>
@@ -304,6 +313,7 @@ function Options({
               !selected.length ||
               detail.request.automationPaused ||
               !rankingReady ||
+              !canFollowUp ||
               isContacting
             }
             onClick={() => {
@@ -323,7 +333,7 @@ function Options({
             }}
             size="sm"
           >
-            {isContacting ? 'Starting contact…' : 'Contact selected'}
+            {isContacting ? 'Starting follow-up…' : 'Follow up with selected'}
           </Button>
         </div>
       ) : null}

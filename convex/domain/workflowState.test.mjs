@@ -12,6 +12,11 @@ import {
 
 test('request transitions permit bounded progression and reject invalid selection', () => {
   assert.equal(transitionRequest('draft', 'researching'), 'researching')
+  assert.equal(transitionRequest('researching', 'evaluating'), 'evaluating')
+  assert.equal(
+    transitionRequest('awaiting_selection', 'contacting'),
+    'contacting',
+  )
   assert.equal(transitionRequest('contacting', 'cancelled'), 'cancelled')
   assert.throws(
     () => transitionRequest('draft', 'completed'),

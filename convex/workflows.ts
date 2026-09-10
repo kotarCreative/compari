@@ -5,6 +5,7 @@ import { internalAction } from './_generated/server'
 import { getWebResearchPort } from './adapters/firecrawl'
 import { getReasoningPort } from './adapters/reasoning'
 import { classifyExternalError } from './domain/outboundPolicy'
+import { pricingEvidencePages } from './domain/websitePricing.ts'
 
 export const extractRequirements = internalAction({
   args: {
@@ -172,10 +173,29 @@ export const researchCandidate = internalAction({
         query: candidate.vendorDetailQuery,
         limit: 5,
       })
+      const pricingPages = pricingEvidencePages(pages)
+      const extractedQuote = pricingPages.length
+        ? await getReasoningPort().extractWebsiteQuote({
+            prompt: candidate.prompt,
+            requirements: candidate.requirements,
+            evidencePages: pricingPages,
+          })
+        : null
+      const sourcePage = extractedQuote
+        ? pricingPages.find((page) => page.url === extractedQuote.sourceUrl)
+        : undefined
+      const websiteQuote =
+        extractedQuote && sourcePage
+          ? {
+              ...extractedQuote,
+              excerpt: sourcePage.markdown.slice(0, 2_000),
+            }
+          : undefined
       await ctx.runMutation(internal.workflowState.recordCandidateResearch, {
         ...args,
         claimToken: claim.claimToken,
         pages,
+        websiteQuote,
       })
     } catch (error) {
       const classified = classifyExternalError(error)

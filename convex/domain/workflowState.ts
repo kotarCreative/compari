@@ -23,11 +23,11 @@ const requestTransitions: Record<
   ReadonlyArray<RequestStatus>
 > = {
   draft: ['researching', 'cancelled'],
-  researching: ['contacting', 'cancelled'],
+  researching: ['contacting', 'evaluating', 'cancelled'],
   contacting: ['collecting_responses', 'cancelled'],
   collecting_responses: ['evaluating', 'cancelled'],
   evaluating: ['awaiting_selection', 'cancelled'],
-  awaiting_selection: ['completed', 'cancelled'],
+  awaiting_selection: ['contacting', 'completed', 'cancelled'],
   completed: [],
   cancelled: [],
 }

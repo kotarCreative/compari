@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import { canApplyRanking, normalizeRankingDto } from './domain/ranking'
+import { transitionRequest } from './domain/workflowState'
 
 const rankingItem = v.object({
   candidateId: v.id('requestCandidates'),
@@ -62,6 +63,7 @@ export const load = internalQuery({
             }),
           ),
           safePublicContactPaths: v.array(v.string()),
+          hasWebsitePrice: v.boolean(),
         }),
       ),
     }),
@@ -104,6 +106,7 @@ export const load = internalQuery({
         confidence: number
       }>
       safePublicContactPaths: Array<string>
+      hasWebsitePrice: boolean
     }>
     for (const candidate of candidates) {
       const business = await ctx.db.get('businesses', candidate.businessId)
@@ -114,6 +117,7 @@ export const load = internalQuery({
           .withIndex('by_candidate_id', (q) =>
             q.eq('candidateId', candidate._id),
           )
+          .order('desc')
           .take(8),
         ctx.db
           .query('contactEndpoints')
@@ -141,12 +145,13 @@ export const load = internalQuery({
           )
           .map((e) => e.type)
           .slice(0, 1),
+        hasWebsitePrice: facts.some(
+          (fact) => fact.key === 'price' && fact.sourceType === 'website',
+        ),
       })
     }
-    // A recommendation is an invitation to contact a provider. Do not ask the
-    // ranker to recommend a candidate unless retained public evidence includes
-    // a supported, verified email path; the apply boundary marks the rest not
-    // recommended. Contact-form automation is not enabled in this release.
+    // Published pricing is already a usable option. Otherwise fail closed and
+    // require a supported email path for any later factual follow-up.
     return {
       prompt: request.prompt.slice(0, 4_000),
       requestRequirements: requirements.map((r) => ({
@@ -154,7 +159,9 @@ export const load = internalQuery({
         value: JSON.stringify(r.value.value).slice(0, 500),
       })),
       candidates: hydrated.filter(
-        (candidate) => candidate.safePublicContactPaths.length > 0,
+        (candidate) =>
+          candidate.hasWebsitePrice ||
+          candidate.safePublicContactPaths.length > 0,
       ),
     }
   },
@@ -242,6 +249,47 @@ export const apply = internalMutation({
       rankingVersion: request.version,
       updatedAt: now,
     })
+    const proposals = await ctx.db
+      .query('proposals')
+      .withIndex('by_request_id', (q) => q.eq('requestId', request._id))
+      .order('desc')
+      .take(20)
+    const hasWebsiteQuote = proposals.some((proposal) => {
+      const value = proposal.attributes.value
+      return (
+        proposal.status === 'received' &&
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        (value as Record<string, unknown>).evidence_source === 'Public website'
+      )
+    })
+    if (hasWebsiteQuote && request.status === 'researching') {
+      transitionRequest('researching', 'evaluating')
+      const evaluationVersion = request.version
+      const evaluationJobId = await ctx.db.insert('sideEffectJobs', {
+        userId: request.userId,
+        kind: 'evaluate_request',
+        idempotencyKey: `evaluate-website-quotes:${request._id}:v${evaluationVersion}`,
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: 2,
+        requestId: request._id,
+        inputVersion: evaluationVersion,
+        scheduledAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })
+      await ctx.db.patch('procurementRequests', request._id, {
+        status: 'evaluating',
+        evaluationInputVersion: evaluationVersion,
+        updatedAt: now,
+      })
+      await ctx.scheduler.runAfter(200, internal.evaluationsWorkflow.generate, {
+        requestId: request._id,
+        jobId: evaluationJobId,
+      })
+    }
     await ctx.db.insert('activityEvents', {
       requestId: request._id,
       eventType: 'candidates_ranked',

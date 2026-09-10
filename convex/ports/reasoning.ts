@@ -31,6 +31,16 @@ export type ProviderExtraction = {
   providerQuestion?: string
   confidence: number
 }
+export type WebsiteQuote = {
+  price: string
+  pricingType:
+    'exact' | 'range' | 'starting_at' | 'rate' | 'package' | 'estimate'
+  scope?: string
+  conditions?: string
+  missingInformation: Array<string>
+  sourceUrl: string
+  confidence: number
+}
 export type OutreachEmail = { subject: string; body: string }
 export type OutreachEmailContext = {
   originalRequest: string
@@ -65,6 +75,15 @@ export interface ReasoningPort {
     requirements: Array<ExtractedRequirement>
     answeredQuestions: Array<AnsweredQuestion>
   }) => Promise<ProviderSearchPlan>
+  extractWebsiteQuote: (input: {
+    prompt: string
+    requirements: Array<{ label: string; value: string }>
+    evidencePages: Array<{
+      url: string
+      title?: string
+      markdown: string
+    }>
+  }) => Promise<WebsiteQuote | null>
   composeOutreachEmail: (input: OutreachEmailContext) => Promise<OutreachEmail>
   /** The caller supplies provider content inside explicit untrusted delimiters. */
   extractProviderResponse: (input: {

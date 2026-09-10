@@ -6,6 +6,7 @@ import {
   normalizeOutreachEmail,
   normalizeProviderSearchPlan,
   normalizeProviderResponse,
+  normalizeWebsiteQuote,
 } from './reasoning.ts'
 import {
   canonicalizeLegacyOfferTerms,
@@ -95,6 +96,49 @@ test('provider search planning uses the original prompt and buyer answers', asyn
   assert.match(plan.discoveryQueries[0] ?? '', /45 people/i)
   assert.match(plan.discoveryQueries[0] ?? '', /Canmore, Alberta/i)
   assert.match(plan.vendorDetailQuery, /pricing/i)
+})
+
+test('website quote extraction preserves a published price and its exact source URL', async () => {
+  const port = createDeterministicReasoningPort()
+  const quote = await port.extractWebsiteQuote({
+    prompt: 'Need an interior detail for an SUV',
+    requirements: [{ label: 'Vehicle', value: 'SUV' }],
+    evidencePages: [
+      {
+        url: 'https://detailer.test/pricing',
+        markdown: 'Full interior detail — starting at $219 CAD',
+      },
+    ],
+  })
+
+  assert.equal(quote?.price, 'Full interior detail — starting at $219 CAD')
+  assert.equal(quote?.pricingType, 'starting_at')
+  assert.equal(quote?.sourceUrl, 'https://detailer.test/pricing')
+})
+
+test('website quote normalization fails closed on invented citations', () => {
+  const wire = {
+    schemaVersion: 1,
+    hasRelevantPrice: true,
+    price: 'From $219 CAD',
+    pricingType: 'starting_at',
+    scope: 'Interior detailing',
+    conditions: null,
+    missingInformation: ['Vehicle size surcharge'],
+    sourceUrl: 'https://invented.test/pricing',
+    confidence: 0.9,
+  }
+  assert.equal(
+    normalizeWebsiteQuote(wire, new Set(['https://detailer.test/pricing'])),
+    null,
+  )
+  assert.equal(
+    normalizeWebsiteQuote(
+      { ...wire, hasRelevantPrice: false, sourceUrl: null, price: null },
+      new Set(['https://detailer.test/pricing']),
+    ),
+    null,
+  )
 })
 
 test('outreach composition turns structured requirements into human prose', async () => {

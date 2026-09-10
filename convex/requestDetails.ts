@@ -66,6 +66,7 @@ export const get = query({
         shortlistReason: v.optional(v.string()),
         recommendationStatus: v.optional(v.string()),
         recommendationScore: v.optional(v.number()),
+        shortlistRank: v.optional(v.number()),
         recommendationReason: v.optional(v.string()),
         recommendationCaveats: v.optional(v.array(v.string())),
         endpoints: v.array(
@@ -162,6 +163,7 @@ export const get = query({
       shortlistReason?: string
       recommendationStatus?: string
       recommendationScore?: number
+      shortlistRank?: number
       recommendationReason?: string
       recommendationCaveats?: Array<string>
       endpoints: Array<{
@@ -198,6 +200,7 @@ export const get = query({
           .withIndex('by_candidate_id', (q) =>
             q.eq('candidateId', candidate._id),
           )
+          .order('desc')
           .take(20),
       ])
       candidateDetails.push({
@@ -211,6 +214,7 @@ export const get = query({
         shortlistReason: candidate.shortlistReason,
         recommendationStatus: candidate.recommendationStatus,
         recommendationScore: candidate.recommendationScore,
+        shortlistRank: candidate.shortlistRank,
         recommendationReason: candidate.recommendationReason,
         recommendationCaveats: candidate.recommendationCaveats,
         endpoints: endpoints.map((endpoint) => ({
@@ -316,7 +320,11 @@ export const get = query({
         status: item.status,
         answer: item.answer,
       })),
-      candidates: candidateDetails,
+      candidates: candidateDetails.sort(
+        (left, right) =>
+          (left.shortlistRank ?? Number.MAX_SAFE_INTEGER) -
+          (right.shortlistRank ?? Number.MAX_SAFE_INTEGER),
+      ),
       outreach: attempts.map((item) => ({
         _id: item._id,
         candidateId: item.candidateId,
