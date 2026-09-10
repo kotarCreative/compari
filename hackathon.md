@@ -3,16 +3,16 @@
 - **Project:** Compari
 - **Event:** Convex All Gas Hackathon
 - **What it does:** A buyer-side procurement workflow in development that turns requests and approximate buyer location into relevant, evidence-backed provider comparisons, with bounded automated research/outreach and an explicit final-choice gate.
-- **Live app:** not deployed
+- **Live app:** https://enduring-husky-65.convex.site/
 - **Repo:** none
-- **Frontend:** Other (TanStack Start)
+- **Frontend:** Convex static hosting (TanStack Start)
 - **Convex deployment:** not deployed
-- **Components:** none
+- **Components:** @convex-dev/static-hosting
 - **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, realtime queries
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini, gpt-5.6-luna
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-07T03:42:34Z
+- **Last updated:** 2026-09-10T03:50:02Z
 
 ## Log
 
@@ -124,3 +124,17 @@ readable outreach status (`convex/users.ts`, `src/features/workspace/`,
 strict structured output for canonical price and availability fields, including
 compatibility for existing responses (`convex/adapters/`, `convex/proposals.ts`).
 Tests, typecheck, lint, production build, and Convex development validation pass.
+
+### 2026-09-10 - 57dd100
+
+Registered Convex static hosting and added a Compari logo, matching favicons,
+social preview, canonical metadata, structured data, and a public-page sitemap
+(`87e4666`, `61e86f9`; `convex/convex.config.ts`, `vite.config.ts`, `public/`,
+`src/routes/`). Prerendered homepage HTML now includes the introduction; the
+new-request page is marked noindex. Added a responsive animated raccoon mascot
+with a reduced-motion still, keyboard-accessible request cards, and validated
+links to original vendor websites (`src/components/common/ChairMascot.tsx`,
+`src/features/`, `src/styles/app.css`, `docs/mascot-artwork.md`). Typecheck, lint,
+the evidence-link test, and the production build pass; generated SEO output was
+checked and the local dev server returned HTTP 200. The public app address was
+supplied by the builder; these latest changes have not been deployed.
