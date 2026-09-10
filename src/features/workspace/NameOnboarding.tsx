@@ -12,6 +12,7 @@ import {
 import { OnboardingTransition } from './OnboardingTransition'
 import { RequestConversation } from './RequestConversation'
 import type { Profile } from './contracts'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { Button, Input, Label } from '~/components/ui'
 
 export function NameOnboarding({ profile }: { profile: Profile }) {
@@ -97,7 +98,7 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
     if (pendingPrompt)
       return (
         <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
-          <p className="mb-10 brand-wordmark">compari</p>
+          <BrandLogo className="mb-10" />
           <RequestConversation
             loaderPhase="interpreting"
             prompt={pendingPrompt}

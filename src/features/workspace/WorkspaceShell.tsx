@@ -8,6 +8,7 @@ import { pendingFirstRequestKey } from './constants'
 import { requestsApi } from './contracts'
 import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import type { Profile } from './contracts'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { NotebookPal } from '~/components/common/NotebookPal'
 import { LoadingCards } from '~/components/common/ResearchLoader'
 import { errorMessage } from '~/lib/errors'
@@ -62,7 +63,7 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
     <main className="mx-auto min-h-screen max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex items-start justify-between gap-4 pb-6 dark:border-slate-800">
         <div>
-          <p className="brand-wordmark">compari</p>
+          <BrandLogo />
           <h1 className="mt-2 text-3xl font-bold">
             Welcome, {firstName}
             <span className="text-sky-600">.</span>

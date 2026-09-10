@@ -4,6 +4,7 @@ import { productApi } from '../request/contracts'
 import { pendingFirstRequestIdKey, pendingFirstRequestKey } from './constants'
 import { requestsApi } from './contracts'
 import { RequestConversation } from './RequestConversation'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 
@@ -114,7 +115,7 @@ export function FirstRequestOnboarding({
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-8 py-12 md:py-20">
-      <p className="mb-10 brand-wordmark">compari</p>
+      <BrandLogo className="mb-10" />
       <RequestConversation
         answer={answerDraft}
         error={

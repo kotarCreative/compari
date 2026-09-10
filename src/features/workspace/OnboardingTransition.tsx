@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { ResearchLoader } from '~/components/common/ResearchLoader'
 
 export const progressMessages = [
@@ -56,7 +57,7 @@ export function OnboardingTransition({
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-8 text-center">
       <ResearchLoader />
       <div aria-live="polite" role="status">
-        <p className="brand-wordmark">compari</p>
+        <BrandLogo />
         <h1 className="mt-4 text-3xl font-bold tracking-tight">
           {firstName ? `${title}, ${firstName}` : title}
         </h1>

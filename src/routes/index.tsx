@@ -4,16 +4,35 @@ import { useEffect, useState } from 'react'
 import { CenteredMessage } from '~/components/common/CenteredMessage'
 import { FirstSearch } from '~/features/workspace/FirstSearch'
 import { NameOnboarding } from '~/features/workspace/NameOnboarding'
-import { OnboardingTransition } from '~/features/workspace/OnboardingTransition'
 import { WorkspaceShell } from '~/features/workspace/WorkspaceShell'
 import { usersApi } from '~/features/workspace/contracts'
+import { publicUrl, siteDescription, siteOrigin } from '~/lib/seo'
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/')({
+  head: () => ({
+    links: siteOrigin ? [{ rel: 'canonical', href: publicUrl('/') }] : [],
+    scripts: siteOrigin
+      ? [
+          {
+            type: 'application/ld+json',
+            children: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'Compari',
+              url: publicUrl('/'),
+              description: siteDescription,
+              inLanguage: 'en',
+            }).replace(/</g, '\\u003c'),
+          },
+        ]
+      : [],
+  }),
+  component: Home,
+})
 
 function Home() {
   const { isLoading, isAuthenticated } = useConvexAuth()
-  if (isLoading)
-    return <OnboardingTransition title="Restoring your secure session" />
+  if (isLoading) return <FirstSearch isSessionLoading />
   if (!isAuthenticated) return <FirstSearch />
   return <Bootstrap />
 }

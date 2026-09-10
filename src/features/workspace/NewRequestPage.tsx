@@ -4,6 +4,7 @@ import { FirstRequestOnboarding } from './FirstRequestOnboarding'
 import { LocationPill } from './LocationPill'
 import { requestPromptPlaceholder } from './constants'
 import type { Profile } from './contracts'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { Button, Label, Textarea } from '~/components/ui'
 
 export function NewRequestPage({ profile }: { profile: Profile }) {
@@ -23,7 +24,7 @@ export function NewRequestPage({ profile }: { profile: Profile }) {
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-10 sm:px-8 sm:py-16">
       <div className="flex items-center justify-between gap-4">
-        <p className="brand-wordmark">compari</p>
+        <BrandLogo />
         <Link
           className="marker-button font-hand text-xl font-bold text-slate-700"
           to="/"

@@ -10,10 +10,15 @@ import {
 } from './constants'
 import { RequestConversation } from './RequestConversation'
 import type { FormEvent } from 'react'
+import { BrandLogo } from '~/components/common/BrandLogo'
 import { NotebookPal } from '~/components/common/NotebookPal'
 import { Button, Input, Label, Textarea } from '~/components/ui'
 
-export function FirstSearch() {
+export function FirstSearch({
+  isSessionLoading = false,
+}: {
+  isSessionLoading?: boolean
+}) {
   const { signIn } = useAuthActions()
   const [fullName, setFullName] = useState('')
   const [step, setStep] = useState<'name' | 'request'>('name')
@@ -61,7 +66,7 @@ export function FirstSearch() {
   if (isStarting) {
     return (
       <main className="welcome-shell mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-12">
-        <p className="mb-10 brand-wordmark">compari</p>
+        <BrandLogo className="mb-10" />
         <RequestConversation
           loaderPhase="interpreting"
           prompt={prompt.trim()}
@@ -72,7 +77,7 @@ export function FirstSearch() {
 
   return (
     <main className="welcome-shell mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-12">
-      <p className="brand-wordmark">compari</p>
+      <BrandLogo />
       <div
         className="mt-8 flex items-center gap-3 text-xs font-medium text-slate-500"
         aria-label={`Step ${step === 'name' ? '1' : '2'} of 2`}
@@ -121,7 +126,12 @@ export function FirstSearch() {
             <p className="text-xs leading-5 text-slate-500">
               We use your name for your buyer inbox and to sign vendor outreach.
             </p>
-            <Button className="mt-3" size="lg" type="submit">
+            <Button
+              className="mt-3"
+              size="lg"
+              type="submit"
+              disabled={isSessionLoading}
+            >
               Let’s get started <span aria-hidden="true">→</span>
             </Button>
             {error ? (

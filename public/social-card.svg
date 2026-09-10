@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f8f3e8"/>
+  <g fill="none" stroke="#ded3bf" stroke-width="2">
+    <rect x="28" y="28" width="1144" height="574" rx="26"/>
+    <path d="M80 470h1040M80 500h1040M80 530h1040"/>
+  </g>
+  <g transform="translate(80 68)">
+    <path d="M91 35a39 39 0 1 0 7 48" fill="none" stroke="#443a30" stroke-width="13" stroke-linecap="round"/>
+    <path d="m57 61 14 15 32-35" fill="none" stroke="#95602e" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g font-family="DejaVu Sans, sans-serif" fill="#352e28">
+    <text x="226" y="157" font-size="64" font-weight="bold" letter-spacing="-3">compari</text>
+    <text x="80" y="294" font-size="60" font-weight="bold">Find the right vendors.</text>
+    <text x="80" y="375" font-size="60" font-weight="bold" fill="#95602e">Make a clearer choice.</text>
+    <text x="80" y="527" font-size="28">Your research buddy for life's big decisions.</text>
+  </g>
+</svg>

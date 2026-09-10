@@ -8,7 +8,15 @@ import { NameOnboarding } from '~/features/workspace/NameOnboarding'
 import { NewRequestPage } from '~/features/workspace/NewRequestPage'
 import { usersApi } from '~/features/workspace/contracts'
 
-export const Route = createFileRoute('/requests/new')({ component: NewRequest })
+export const Route = createFileRoute('/requests/new')({
+  head: () => ({
+    meta: [
+      { title: 'New request — Compari' },
+      { name: 'robots', content: 'noindex, follow' },
+    ],
+  }),
+  component: NewRequest,
+})
 
 function NewRequest() {
   const { isLoading, isAuthenticated } = useConvexAuth()

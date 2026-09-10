@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://enduring-husky-65.convex.site/sitemap.xml
