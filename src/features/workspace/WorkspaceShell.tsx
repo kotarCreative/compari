@@ -154,7 +154,28 @@ function RequestWorkspace({
           </div>
         ) : (
           requests.page.map((request) => (
-            <Card className="sticky-note" key={request._id}>
+            <Card
+              aria-label={`Open ${request.title} workspace`}
+              className="sticky-note cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+              key={request._id}
+              onClick={() => {
+                setSubmittedPrompt(request.prompt)
+                setSelectedRequestId(request._id)
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.target !== event.currentTarget ||
+                  (event.key !== 'Enter' && event.key !== ' ')
+                )
+                  return
+
+                event.preventDefault()
+                setSubmittedPrompt(request.prompt)
+                setSelectedRequestId(request._id)
+              }}
+              role="button"
+              tabIndex={0}
+            >
               <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
                 <div>
                   <CardTitle className="text-3xl">{request.title}</CardTitle>
@@ -180,7 +201,8 @@ function RequestWorkspace({
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     disabled={updatingRequestId === request._id}
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation()
                       setError(null)
                       setUpdatingRequestId(request._id)
                       void (
@@ -206,15 +228,6 @@ function RequestWorkspace({
                       : request.automationPaused
                         ? 'Resume research'
                         : 'Pause automation'}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSubmittedPrompt(request.prompt)
-                      setSelectedRequestId(request._id)
-                    }}
-                    size="sm"
-                  >
-                    Open workspace
                   </Button>
                 </div>
               </CardContent>

@@ -5,6 +5,7 @@ import { RequestConversation } from '../workspace/RequestConversation'
 import { productApi } from './contracts'
 import { AgentProgress } from './components/AgentProgress'
 import { OutreachStatus } from './components/OutreachStatus'
+import { safeEvidenceUrl } from './evidencePolicy'
 import type { RequestDetailValue as Detail } from './contracts'
 import { errorMessage } from '~/lib/errors'
 import { Alert, Button } from '~/components/ui'
@@ -218,8 +219,9 @@ function Options({
                   endpoint.verificationState === 'verified'),
             )
             const checked = selected.includes(candidate._id)
+            const websiteUrl = safeEvidenceUrl(candidate.website)
             return (
-              <label
+              <div
                 className={`option-row cursor-pointer px-4 py-5 transition-colors ${
                   checked || selectedForContact
                     ? 'bg-sky-100/40'
@@ -227,12 +229,16 @@ function Options({
                 }`}
                 key={candidate._id}
               >
-                <div className="flex items-start gap-3">
+                <label
+                  className="flex items-start gap-3"
+                  htmlFor={`candidate-${candidate._id}`}
+                >
                   <input
                     aria-label={`Select ${candidate.name}`}
                     checked={checked || selectedForContact}
                     className="ink-checkbox mt-1"
                     disabled={selectedForContact || !hasEmail || isContacting}
+                    id={`candidate-${candidate._id}`}
                     onChange={() => toggle(candidate._id)}
                     type="checkbox"
                   />
@@ -257,8 +263,21 @@ function Options({
                           : 'Waiting for a contact method'}
                     </p>
                   </div>
-                </div>
-              </label>
+                </label>
+                {websiteUrl ? (
+                  <p className="mt-3 pl-8 text-xs">
+                    <a
+                      className="font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-100"
+                      href={websiteUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Verify on original website{' '}
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  </p>
+                ) : null}
+              </div>
             )
           })}
         </div>

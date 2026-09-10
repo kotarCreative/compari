@@ -1,0 +1,9 @@
+# Mascot artwork
+
+Generated with the built-in image generation tool. The original transparent PNG
+is saved at `public/illustrations/raccoon-chair.png`. `ChairMascot.tsx` adds localized
+paw and pencil motion and serves the still image for reduced-motion preferences.
+
+## Generation prompt
+
+Use case: illustration-story. Create a polished website mascot illustration: a small adorable raccoon sitting on a chair far too big for it, holding a clipboard in its paws and a pencil ready to write. Genuine coherent three-quarter perspective, facing toward the viewer's right, camera slightly above the seat. All chair edges, seat plane, backrest, four legs and stretchers must agree geometrically with this ONE viewpoint. Raccoon hips planted on seat, two short skinny furry lower legs dangling freely over the FRONT edge with small dark paws suspended well above the floor. Legs separated and plainly visible, no chair legs or tail immediately behind the dangling feet, so the feet can be animated later. Big ringed tail curls off left side of seat, distinct from the feet. Friendly raccoon face, black eye mask, rounded ears, gray and warm ivory fur, mustard scarf. One paw supports clipboard and the other holds a pencil touching paper; writing paw and pencil clearly silhouetted on the right of clipboard. Oversized sage green wooden chair with warm brown legs. Style: beautifully drawn children's book spot illustration, delicate dark brown ink outlines, restrained watercolor shading, clean readable shapes at small scale, warm natural palette. Entire chair and animal visible with modest equal padding, centered single isolated subject. Portrait composition 1024x1536 if possible. Transparent background with real alpha, no scenery, no ground plane, no text, no lettering, no caption, no watermark. Anatomically and structurally believable, no skewed seat, no impossible chair joints. Do not imitate a crude SVG icon.

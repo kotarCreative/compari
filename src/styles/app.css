@@ -154,6 +154,84 @@
 }
 
 @layer components {
+  .mascot-layout {
+    --mascot-rail: clamp(160px, 19vw, 260px);
+    --mascot-content-width: 56rem;
+    /* Include the page's auto margin in the visible left column. */
+    --mascot-column-width: calc(
+      var(--mascot-rail) +
+        max(0px, (100vw - var(--mascot-rail) - var(--mascot-content-width)) / 2)
+    );
+    padding-left: var(--mascot-rail);
+  }
+  .mascot-layout:has(.mascot-page main.max-w-2xl) {
+    --mascot-content-width: 42rem;
+  }
+  .mascot-layout:has(.mascot-page main.max-w-xl) {
+    --mascot-content-width: 36rem;
+  }
+  .mascot-layout:has(.mascot-page main > section.max-w-md) {
+    --mascot-content-width: 28rem;
+  }
+  .mascot-page {
+    min-width: 0;
+  }
+  .chair-mascot {
+    position: fixed;
+    left: calc(var(--mascot-column-width) / 2);
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--mascot-rail);
+    padding: 12px;
+    pointer-events: none;
+    user-select: none;
+  }
+  .chair-mascot svg,
+  .chair-mascot-still {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+  .chair-mascot-still {
+    display: none;
+    height: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chair-mascot .chair-mascot-animated {
+      display: none;
+    }
+    .chair-mascot-still {
+      display: block;
+    }
+  }
+  .chair-mascot-caption {
+    display: block;
+    color: #8b7c6b;
+    font-family: var(--font-hand);
+    font-size: clamp(17px, 1.7vw, 23px);
+    text-align: center;
+    transform: rotate(-4deg);
+  }
+  @media (max-width: 639px) {
+    .mascot-layout {
+      padding-left: 0;
+    }
+    .chair-mascot {
+      position: relative;
+      left: auto;
+      top: auto;
+      transform: none;
+      width: 100px;
+      margin: 8px 0 -12px 16px;
+      padding: 0;
+    }
+    .chair-mascot-caption {
+      display: none;
+    }
+    .mascot-page > main {
+      min-height: calc(100svh - 125px);
+    }
+  }
   .welcome-page {
     padding-block: 1.5rem;
   }

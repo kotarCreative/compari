@@ -7,6 +7,7 @@ import {
 import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
+import { ChairMascot } from '~/components/common/ChairMascot'
 import { publicUrl, siteDescription, siteOrigin, siteTitle } from '~/lib/seo'
 
 export const Route = createRootRouteWithContext<{
@@ -79,7 +80,12 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <div className="mascot-layout">
+        <ChairMascot />
+        <div className="mascot-page">
+          <Outlet />
+        </div>
+      </div>
     </RootDocument>
   )
 }
