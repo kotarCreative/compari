@@ -41,6 +41,10 @@ test('retains bounded verbatim context from every page with potential pricing', 
 test('rejects price summaries whose amounts or currency are not in the cited excerpt', () => {
   const excerpt = 'Interior detail: $219–$249 CAD depending on vehicle size.'
   assert.equal(publishedPriceIsSupported('$219-$249 CAD', excerpt), true)
+  assert.equal(
+    publishedPriceIsSupported('$1,299 CAD', 'Complete package: $1,299.00 CAD'),
+    true,
+  )
   assert.equal(publishedPriceIsSupported('$199-$249 CAD', excerpt), false)
   assert.equal(publishedPriceIsSupported('$219-$249 USD', excerpt), false)
 })

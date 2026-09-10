@@ -68,7 +68,10 @@ export function publishedPriceIsSupported(
   const normalizeAmounts = (value: string) =>
     value
       .match(/\d[\d,.]*/g)
-      ?.map((amount) => amount.replace(/,/g, '').replace(/[.]$/, '')) ?? []
+      ?.map((amount) => amount.replace(/,/g, '').replace(/[.]$/, ''))
+      .map((amount) => Number(amount))
+      .filter(Number.isFinite)
+      .map(String) ?? []
   const claimedAmounts = normalizeAmounts(price)
   const sourceAmounts = new Set(normalizeAmounts(sourceExcerpt))
   if (
