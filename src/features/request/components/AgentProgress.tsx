@@ -43,29 +43,27 @@ export function AgentProgress({ detail }: { detail: RequestDetailValue }) {
               ? 'Your shortlist is ready'
               : (stages[stage]?.label ?? 'Waiting for an update')
   const summary = cancelled
-    ? 'This request has stopped. You can still review the details below.'
+    ? 'You can still review your options.'
     : completed
-      ? 'Your choice is saved. All the details are here whenever you need them.'
+      ? 'Your choice is saved.'
       : paused
-        ? 'Resume the agents when you’re ready. New replies will still appear here.'
+        ? 'Resume from Request details.'
         : needsAnswer
-          ? 'Answer the question below so we can keep things moving.'
+          ? 'Answer below to continue.'
           : empty
-            ? 'We haven’t found a suitable match. Review your request before trying again.'
+            ? 'No suitable providers found.'
             : readyToContact
-              ? `${counts.discovered} options found. Choose who you’d like us to contact below.`
+              ? `${counts.discovered} found · follow up to confirm missing details.`
               : request.status === 'researching'
-                ? `${counts.discovered} options found so far. We’re checking which ones fit your request.`
+                ? `${counts.discovered} providers found so far.`
                 : request.status === 'contacting' ||
                     request.status === 'collecting_responses'
-                  ? `${counts.contacted} contacted · ${counts.responded} replied. We’ll gather the details for your comparison.`
+                  ? `${counts.contacted} contacted · ${counts.responded} replied.`
                   : request.status === 'evaluating'
-                    ? `${counts.responded} replies received. We’re weighing the options against what matters to you.`
+                    ? 'Reviewing prices, scope and availability.'
                     : request.status === 'awaiting_selection'
-                      ? 'Your options are compared and ready to review. The final choice is yours.'
-                      : request.status === 'draft'
-                        ? 'We’re reading your notes and working out what to look for.'
-                        : 'Your latest request details will appear here.'
+                      ? 'Review the quotes and choose an option.'
+                      : 'Reading your request.'
 
   return (
     <section aria-labelledby={headingId} className="space-y-3">

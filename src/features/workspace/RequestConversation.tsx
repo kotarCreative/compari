@@ -11,6 +11,7 @@ import { Button, Label, Textarea } from '~/components/ui'
 
 export function RequestConversation({
   prompt,
+  collapseHistory = false,
   history = [],
   question,
   answer = '',
@@ -23,6 +24,7 @@ export function RequestConversation({
   canEditLocation = false,
 }: {
   prompt: string
+  collapseHistory?: boolean
   history?: Array<{
     id: string
     text: string
@@ -46,14 +48,13 @@ export function RequestConversation({
     answerInput.current?.focus()
   }, [question?._id])
 
-  return (
-    <section className="mx-auto w-full max-w-2xl space-y-4">
+  const previousMessages = (
+    <>
       <div className="flex justify-end">
         <p className="max-w-[88%] whitespace-pre-wrap bg-sky-100/40 px-4 py-3 text-sm leading-6 text-slate-800">
           {prompt}
         </p>
       </div>
-
       {history.map((item) => (
         <div className="space-y-3" key={item.id}>
           <QuestionBubble question={item} />
@@ -64,6 +65,20 @@ export function RequestConversation({
           </div>
         </div>
       ))}
+    </>
+  )
+  return (
+    <section className="mx-auto w-full max-w-2xl space-y-4">
+      {collapseHistory ? (
+        <details className="text-sm">
+          <summary className="cursor-pointer py-2 font-semibold">
+            Request & previous answers
+          </summary>
+          <div className="space-y-3">{previousMessages}</div>
+        </details>
+      ) : (
+        previousMessages
+      )}
 
       {question ? (
         <div className="space-y-3">

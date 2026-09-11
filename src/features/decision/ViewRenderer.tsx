@@ -16,16 +16,61 @@ export function ViewRenderer({ views }: { views: Array<View> }) {
   if (!views.length) {
     return (
       <p className="text-sm text-slate-500">
-        Comparison lenses will appear when provider responses arrive.
+        Comparison lenses will appear when website prices or provider responses
+        are available.
       </p>
     )
   }
+  const infoViews = views.filter(
+    (view) =>
+      view.viewType === 'provider_cards' ||
+      view.viewType === 'comparison_matrix',
+  )
+  const detailViews = views.filter(
+    (view) =>
+      view.viewType !== 'provider_cards' &&
+      view.viewType !== 'comparison_matrix',
+  )
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {views.map((view) => (
-        <TrustedView key={view._id} view={view} />
-      ))}
+    <div className="space-y-3">
+      {infoViews.length ? (
+        <div className="flex flex-wrap gap-2">
+          {infoViews.map((view) => (
+            <InfoTooltip key={view._id} view={view} />
+          ))}
+        </div>
+      ) : null}
+      {detailViews.length ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {detailViews.map((view) => (
+            <TrustedView key={view._id} view={view} />
+          ))}
+        </div>
+      ) : null}
     </div>
+  )
+}
+
+function InfoTooltip({ view }: { view: View }) {
+  const copy =
+    view.viewType === 'provider_cards'
+      ? 'The option cards below summarize published website prices and the latest received provider responses.'
+      : 'A full comparison table is still in development. Review each option card for its current terms and missing details.'
+  return (
+    <details className="group relative">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-slate-300 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-sky-500 hover:text-sky-800 [&::-webkit-details-marker]:hidden">
+        {view.label}
+        <span aria-hidden="true" className="text-sm text-sky-700">
+          ⓘ
+        </span>
+      </summary>
+      <p
+        className="absolute left-0 top-full z-20 mt-2 w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-slate-300 bg-[#fffdf7] p-3 text-xs font-normal leading-5 text-slate-600 shadow-lg"
+        role="note"
+      >
+        {copy}
+      </p>
+    </details>
   )
 }
 
@@ -48,74 +93,9 @@ function TrustedView({ view }: { view: View }) {
           {heading}
           {note}
           <p className="mt-3 text-xs font-semibold text-sky-800 dark:text-sky-200">
-            Recommendation is advisory. Confirm a current provider proposal
-            below.
+            Recommendation is advisory. Confirm the current cited website or
+            provider proposal below.
           </p>
-        </article>
-      )
-    case 'provider_cards':
-      return (
-        <article className="py-4">
-          {heading}
-          {note}
-          <div className="mt-3 grid gap-2">
-            {providerLabels.length ? (
-              providerLabels.map((provider) => (
-                <div className="py-2 text-xs" key={provider}>
-                  {provider}
-                  <span className="ml-2 text-slate-500">
-                    Evidence available for review
-                  </span>
-                </div>
-              ))
-            ) : (
-              <EmptyLens />
-            )}
-          </div>
-        </article>
-      )
-    case 'comparison_matrix':
-      return (
-        <article className="overflow-auto py-4">
-          {heading}
-          {note}
-          <table className="mt-3 w-full text-left text-xs">
-            <thead>
-              <tr>
-                <th className="pr-3">Metric</th>
-                {providerLabels.map((provider) => (
-                  <th className="pr-3" key={provider}>
-                    {provider}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.length ? (
-                metrics.map((metric) => (
-                  <tr className="even:bg-sky-100/25" key={metric}>
-                    <th className="py-1 pr-3 font-medium">
-                      {humanize(metric)}
-                    </th>
-                    {providerLabels.map((provider) => (
-                      <td className="py-1 pr-3 text-slate-500" key={provider}>
-                        See evidence
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    className="py-2 text-slate-500"
-                    colSpan={Math.max(providerLabels.length + 1, 1)}
-                  >
-                    No comparable metric is available yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </article>
       )
     case 'ranking':
@@ -193,13 +173,13 @@ function TrustedView({ view }: { view: View }) {
             <div className="pl-3">
               <strong>{providerLabels[0] ?? 'Provider A'}</strong>
               <p className="mt-1 text-slate-500">
-                Review its retained facts and terms.
+                Review its retained website or provider facts and terms.
               </p>
             </div>
             <div className="pl-3">
               <strong>{providerLabels[1] ?? 'Provider B'}</strong>
               <p className="mt-1 text-slate-500">
-                Review its retained facts and terms.
+                Review its retained website or provider facts and terms.
               </p>
             </div>
           </div>

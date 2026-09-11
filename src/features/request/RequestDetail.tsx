@@ -9,6 +9,7 @@ import { displayEvidenceValue, safeEvidenceUrl } from './evidencePolicy'
 import type { RequestDetailValue as Detail } from './contracts'
 import { errorMessage } from '~/lib/errors'
 import { Alert, Button } from '~/components/ui'
+import { DetailDialog } from '~/components/common/DetailDialog'
 
 export function RequestDetail({
   requestId,
@@ -57,7 +58,7 @@ export function RequestDetail({
   }
 
   return (
-    <section className="mt-8 space-y-12 py-4">
+    <section className="mt-8 space-y-6 py-4">
       <header className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -70,28 +71,46 @@ export function RequestDetail({
             <Button onClick={onClose} size="sm" variant="outline">
               All requests
             </Button>
-            <Button
-              onClick={() =>
-                run(
-                  detail.request.automationPaused
-                    ? resume({ requestId })
-                    : pause({ requestId }),
-                )
-              }
-              size="sm"
-              variant="outline"
-            >
-              {detail.request.automationPaused
-                ? 'Resume agents'
-                : 'Pause agents'}
-            </Button>
-            <Button
-              onClick={() => run(cancel({ requestId }))}
-              size="sm"
-              variant="ghost"
-            >
-              Cancel
-            </Button>
+            <DetailDialog label="Request details">
+              <p className="mb-4 whitespace-pre-wrap text-sm leading-6">
+                {detail.request.prompt}
+              </p>
+              {detail.questions
+                .filter((question) => question.answer)
+                .map((question) => (
+                  <div className="mb-4 text-sm" key={question._id}>
+                    <p className="font-semibold">{question.text}</p>
+                    <p className="mt-1">{question.answer}</p>
+                  </div>
+                ))}
+              {error ? <Alert variant="destructive">{error}</Alert> : null}
+              {!['completed', 'cancelled'].includes(detail.request.status) ? (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() =>
+                      run(
+                        detail.request.automationPaused
+                          ? resume({ requestId })
+                          : pause({ requestId }),
+                      )
+                    }
+                    size="sm"
+                    variant="outline"
+                  >
+                    {detail.request.automationPaused
+                      ? 'Resume agents'
+                      : 'Pause agents'}
+                  </Button>
+                  <Button
+                    onClick={() => run(cancel({ requestId }))}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Cancel comparison
+                  </Button>
+                </div>
+              ) : null}
+            </DetailDialog>
           </div>
         </div>
         <AgentProgress detail={detail} />
@@ -101,6 +120,7 @@ export function RequestDetail({
 
       {isIntakeVisible ? (
         <RequestConversation
+          collapseHistory
           answer={answerDraft}
           history={detail.questions.flatMap((question) =>
             question.answer
@@ -139,12 +159,36 @@ export function RequestDetail({
         />
       ) : (
         <div className="space-y-6">
-          <Options
-            detail={detail}
-            onError={setError}
-            retryFailed={retryFailed}
-            selectCandidates={selectCandidates}
-          />
+          {detail.request.status === 'researching' ? (
+            <Options
+              detail={detail}
+              onError={setError}
+              retryFailed={retryFailed}
+              selectCandidates={selectCandidates}
+            />
+          ) : (
+            <DetailDialog
+              label={
+                detail.outreach.some((attempt) =>
+                  [
+                    'retryable_failure',
+                    'permanent_failure',
+                    'needs_user',
+                  ].includes(attempt.status),
+                )
+                  ? 'Follow-up needs attention'
+                  : 'Providers & follow-up'
+              }
+            >
+              {error ? <Alert variant="destructive">{error}</Alert> : null}
+              <Options
+                detail={detail}
+                onError={setError}
+                retryFailed={retryFailed}
+                selectCandidates={selectCandidates}
+              />
+            </DetailDialog>
+          )}
           <DecisionPanel
             providers={detail.candidates.map((candidate) => ({
               id: candidate._id,
@@ -202,8 +246,7 @@ function Options({
             Your options
           </h3>
           <p className="text-sm text-slate-500">
-            Published website prices are shown first. Follow up only when you
-            want missing details confirmed.
+            Select up to 5 providers to confirm missing details.
           </p>
         </div>
         {options.length ? (
@@ -244,7 +287,12 @@ function Options({
                     aria-label={`Select ${candidate.name}`}
                     checked={checked || selectedForContact}
                     className="ink-checkbox mt-1"
-                    disabled={selectedForContact || !hasEmail || isContacting}
+                    disabled={
+                      selectedForContact ||
+                      !hasEmail ||
+                      isContacting ||
+                      !canFollowUp
+                    }
                     id={`candidate-${candidate._id}`}
                     onChange={() => toggle(candidate._id)}
                     type="checkbox"
@@ -281,8 +329,7 @@ function Options({
                       rel="noreferrer"
                       target="_blank"
                     >
-                      Verify on original website{' '}
-                      <span aria-hidden="true">↗</span>
+                      View website <span aria-hidden="true">↗</span>
                     </a>
                   </p>
                 ) : null}
@@ -338,11 +385,25 @@ function Options({
         </div>
       ) : null}
 
-      <OutreachStatus
-        detail={detail}
-        onError={onError}
-        retryFailed={retryFailed}
-      />
+      {detail.outreach.length ? (
+        <details
+          className="mt-4"
+          open={detail.outreach.some((attempt) =>
+            ['retryable_failure', 'permanent_failure', 'needs_user'].includes(
+              attempt.status,
+            ),
+          )}
+        >
+          <summary className="cursor-pointer py-2 text-sm font-semibold">
+            Follow-up activity ({detail.outreach.length})
+          </summary>
+          <OutreachStatus
+            detail={detail}
+            onError={onError}
+            retryFailed={retryFailed}
+          />
+        </details>
+      ) : null}
     </section>
   )
 }

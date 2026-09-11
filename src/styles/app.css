@@ -296,6 +296,48 @@
     background-color: #ffedb460;
   }
 
+  .decision-option-card {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.25rem, 4vw, 2rem);
+    border: 1.5px solid #c4b59e;
+    border-radius: 8px 18px 12px 7px / 14px 8px 16px 10px;
+    background: linear-gradient(168deg, #ffedb43d, transparent 28%), #fffdf7;
+    box-shadow:
+      2px 5px 0 #ded3bf80,
+      0 18px 32px -28px #352e28;
+    animation: onboarding-welcome-up 220ms ease-out both;
+  }
+  .decision-option-card::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 12%;
+    width: 70px;
+    height: 22px;
+    background: #f7d9848c;
+    transform: rotate(3deg);
+  }
+  .decision-term {
+    min-width: 0;
+    padding: 0.75rem;
+    border-radius: 6px 10px 7px 8px;
+    background: #f2eadb80;
+  }
+  .decision-term dt {
+    color: #746757;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .decision-term dd {
+    margin-top: 0.25rem;
+    color: #352e28;
+    font-size: 0.875rem;
+    line-height: 1.35rem;
+  }
+
   .marker-button {
     position: relative;
     isolation: isolate;
