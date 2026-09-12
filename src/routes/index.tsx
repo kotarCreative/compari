@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Navigate, createFileRoute } from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { CenteredMessage } from '~/components/common/CenteredMessage'
@@ -6,6 +6,7 @@ import { FirstSearch } from '~/features/workspace/FirstSearch'
 import { NameOnboarding } from '~/features/workspace/NameOnboarding'
 import { WorkspaceShell } from '~/features/workspace/WorkspaceShell'
 import { usersApi } from '~/features/workspace/contracts'
+import { pendingFirstRequestKey } from '~/features/workspace/constants'
 import { publicUrl, siteDescription, siteOrigin } from '~/lib/seo'
 
 export const Route = createFileRoute('/')({
@@ -41,6 +42,18 @@ function Bootstrap() {
   const ensureCurrentUser = useMutation(usersApi.users.ensureCurrentUser)
   const profile = useQuery(usersApi.users.current)
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [isFinishingIntroduction, setIsFinishingIntroduction] = useState(false)
+
+  useEffect(() => {
+    // Remember the introduction across the reactive profile update. The name
+    // form can unmount before its save promise resolves.
+    if (profile && !profile.hasConfirmedName) setIsFinishingIntroduction(true)
+    else if (
+      profile?.hasConfirmedName &&
+      window.sessionStorage.getItem(pendingFirstRequestKey)
+    )
+      setIsFinishingIntroduction(false)
+  }, [profile])
 
   useEffect(() => {
     if ((profile !== undefined && profile !== null) || bootstrapError) return
@@ -68,5 +81,10 @@ function Bootstrap() {
       />
     )
   if (!profile.hasConfirmedName) return <NameOnboarding profile={profile} />
+  if (
+    isFinishingIntroduction &&
+    !window.sessionStorage.getItem(pendingFirstRequestKey)
+  )
+    return <Navigate to="/requests/new" replace />
   return <WorkspaceShell profile={profile} />
 }
