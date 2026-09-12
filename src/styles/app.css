@@ -538,72 +538,36 @@
     @apply my-1 min-h-11 rounded-xl border border-slate-200 bg-white/60 px-4 py-2 text-left text-sm leading-5 text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900;
   }
   .research-loader {
-    position: relative;
-    width: 144px;
-    height: 144px;
+    width: 164px;
+    height: 120px;
     margin: 0 auto;
   }
-  .research-orbit {
-    position: absolute;
-    inset: 12px;
-    border: 2px dashed #c4b59e;
-    border-radius: 50%;
-    animation: onboarding-orbit 24s linear infinite;
+  .research-loader svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
   }
-  .research-center {
-    position: absolute;
-    inset: 46px;
-    display: grid;
-    place-items: center;
-    border-radius: 18px;
-    background: #ffe58a;
-    color: #443a30;
-    font-size: 28px;
-    border: 2px solid #514638;
-    box-shadow: 3px 4px 0 #e2d6bc;
-    animation: research-breathe 3s ease-in-out infinite;
+  .research-ink {
+    stroke-dasharray: 1;
+    animation: research-write 3.6s linear infinite;
   }
-  .research-tile {
-    position: absolute;
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 40px;
-    border: 1.5px solid #a59680;
-    border-radius: 10px;
-    color: #615344;
-    background: #fffdf7;
-    box-shadow: 0 4px 10px #0c4a6e0d;
-    animation: research-float 3s ease-in-out infinite;
+  .research-ink-2 {
+    animation-name: research-write-second;
   }
-  .research-tile-one {
-    top: 8px;
-    left: 25px;
+  .research-ink-3 {
+    animation-name: research-write-third;
   }
-  .research-tile-two {
-    top: 46px;
-    right: 0;
-    animation-delay: -1s;
-  }
-  .research-tile-three {
-    bottom: 0;
-    left: 30px;
-    animation-delay: -2s;
+  .research-pen {
+    offset-rotate: 0deg;
+    offset-anchor: 0px 0px;
+    animation: research-scribble 3.6s linear infinite;
   }
   .research-loader-compact {
-    width: 44px;
+    width: 60px;
     height: 44px;
     margin: 0;
     flex-shrink: 0;
-  }
-  .research-loader-compact .research-center {
-    inset: 4px;
-    border-radius: 12px;
-    font-size: 22px;
-  }
-  .research-loader-compact .research-tile,
-  .research-loader-compact .research-orbit {
-    display: none;
   }
   .skeleton {
     background: linear-gradient(
@@ -619,14 +583,50 @@
     animation: onboarding-welcome-up 400ms ease-out both;
   }
 }
-@keyframes research-float {
-  50% {
-    transform: translateY(-7px) rotate(8deg);
+@keyframes research-write {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  33.333333%,
+  100% {
+    stroke-dashoffset: 0;
   }
 }
-@keyframes research-breathe {
-  50% {
-    transform: scale(1.08) rotate(-6deg);
+@keyframes research-write-second {
+  0%,
+  33.333333% {
+    stroke-dashoffset: 1;
+  }
+  60%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes research-write-third {
+  0%,
+  60% {
+    stroke-dashoffset: 1;
+  }
+  80%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes research-scribble {
+  0% {
+    offset-distance: 0%;
+  }
+  80%,
+  100% {
+    offset-distance: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .research-ink {
+    stroke-dashoffset: 0;
+  }
+  .research-pen {
+    offset-distance: 100%;
   }
 }
 @keyframes research-shimmer {
