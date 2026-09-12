@@ -4,9 +4,6 @@ import { DecisionPanel } from '../decision/DecisionPanel'
 import { RequestConversation } from '../workspace/RequestConversation'
 import { productApi } from './contracts'
 import { AgentProgress } from './components/AgentProgress'
-import { OutreachStatus } from './components/OutreachStatus'
-import { displayEvidenceValue, safeEvidenceUrl } from './evidencePolicy'
-import type { RequestDetailValue as Detail } from './contracts'
 import { errorMessage } from '~/lib/errors'
 import { Alert, Button } from '~/components/ui'
 import { DetailDialog } from '~/components/common/DetailDialog'
@@ -71,18 +68,24 @@ export function RequestDetail({
             <Button onClick={onClose} size="sm" variant="outline">
               All requests
             </Button>
-            <DetailDialog label="Request details">
-              <p className="mb-4 whitespace-pre-wrap text-sm leading-6">
-                {detail.request.prompt}
-              </p>
-              {detail.questions
-                .filter((question) => question.answer)
-                .map((question) => (
-                  <div className="mb-4 text-sm" key={question._id}>
-                    <p className="font-semibold">{question.text}</p>
-                    <p className="mt-1">{question.answer}</p>
-                  </div>
-                ))}
+            <DetailDialog label="Original conversation">
+              <RequestConversation
+                prompt={detail.request.prompt}
+                history={detail.questions.flatMap((question) =>
+                  question.answer
+                    ? [
+                        {
+                          id: question._id,
+                          text: question.text,
+                          importance: question.importance,
+                          answer: question.answer,
+                        },
+                      ]
+                    : [],
+                )}
+              />
+            </DetailDialog>
+            <DetailDialog label="Request controls">
               {error ? <Alert variant="destructive">{error}</Alert> : null}
               {!['completed', 'cancelled'].includes(detail.request.status) ? (
                 <div className="flex gap-3">
@@ -118,291 +121,57 @@ export function RequestDetail({
 
       {error ? <Alert variant="destructive">{error}</Alert> : null}
 
-      <div>
-        <RequestConversation
-          answer={answerDraft}
-          history={detail.questions.flatMap((question) =>
-            question.answer
-              ? [
-                  {
-                    id: question._id,
-                    text: question.text,
-                    importance: question.importance,
-                    answer: question.answer,
-                  },
-                ]
-              : [],
-          )}
-          isAnswering={isAnswering}
-          loaderPhase={
-            detail.request.status === 'draft' ? 'interpreting' : undefined
-          }
-          onAnswerChange={setAnswerDraft}
-          onAnswerSubmit={(event) => {
-            event.preventDefault()
-            if (!firstOpenQuestion) return
-            setError(null)
-            setIsAnswering(true)
-            void answerQuestion({
-              questionId: firstOpenQuestion._id,
-              answer: answerDraft,
-            })
-              .then(() => setAnswerDraft(''))
-              .catch((reason) =>
-                setError(errorMessage(reason, 'Answer could not be saved.')),
-              )
-              .finally(() => setIsAnswering(false))
-          }}
-          prompt={detail.request.prompt}
-          question={firstOpenQuestion}
-        />
-      </div>
-      {!isIntakeVisible ? (
-        <div className="space-y-6">
-          {detail.request.status === 'researching' ? (
-            <Options
-              detail={detail}
-              onError={setError}
-              retryFailed={retryFailed}
-              selectCandidates={selectCandidates}
-            />
-          ) : (
-            <DetailDialog
-              label={
-                detail.outreach.some((attempt) =>
-                  [
-                    'retryable_failure',
-                    'permanent_failure',
-                    'needs_user',
-                  ].includes(attempt.status),
-                )
-                  ? 'Follow-up needs attention'
-                  : 'Providers & follow-up'
-              }
-            >
-              {error ? <Alert variant="destructive">{error}</Alert> : null}
-              <Options
-                detail={detail}
-                onError={setError}
-                retryFailed={retryFailed}
-                selectCandidates={selectCandidates}
-              />
-            </DetailDialog>
-          )}
-          <DecisionPanel
-            providers={detail.candidates.map((candidate) => ({
-              id: candidate._id,
-              name: candidate.name,
-              factLabels: candidate.facts.map((fact) => fact.label),
-            }))}
-            requestId={detail.request._id}
-            status={detail.request.status}
-          />
-        </div>
-      ) : null}
-    </section>
-  )
-}
-
-function Options({
-  detail,
-  onError,
-  retryFailed,
-  selectCandidates,
-}: {
-  detail: Detail
-  onError: (value: string | null) => void
-  retryFailed: (args: { attemptId: string }) => Promise<unknown>
-  selectCandidates: (args: {
-    requestId: string
-    candidateIds: Array<string>
-  }) => Promise<unknown>
-}) {
-  const [selected, setSelected] = useState<Array<string>>([])
-  const [isContacting, setIsContacting] = useState(false)
-  const options = detail.candidates.filter(
-    (candidate) =>
-      candidate.recommendationStatus === 'recommended' ||
-      candidate.recommendationStatus === 'selected',
-  )
-  const rankingReady = detail.request.rankingStatus === 'ready'
-  const canFollowUp = ['researching', 'awaiting_selection'].includes(
-    detail.request.status,
-  )
-  const toggle = (id: string) =>
-    setSelected((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : current.length < 5
-          ? [...current, id]
-          : current,
-    )
-
-  return (
-    <section aria-labelledby="options-heading">
-      <div className="flex items-end justify-between gap-3">
+      {isIntakeVisible ? (
         <div>
-          <h3 className="text-lg font-semibold" id="options-heading">
-            Your options
-          </h3>
-          <p className="text-sm text-slate-500">
-            Select up to 5 providers to confirm missing details.
-          </p>
-        </div>
-        {options.length ? (
-          <span className="text-xs text-slate-500">{options.length} ready</span>
-        ) : null}
-      </div>
-
-      {options.length ? (
-        <div className="mt-5 grid gap-4">
-          {options.map((candidate) => {
-            const selectedForContact =
-              candidate.recommendationStatus === 'selected'
-            const hasEmail = candidate.endpoints.some(
-              (endpoint) =>
-                endpoint.type === 'email' &&
-                (endpoint.verificationState === 'public' ||
-                  endpoint.verificationState === 'verified'),
-            )
-            const checked = selected.includes(candidate._id)
-            const websiteUrl = safeEvidenceUrl(candidate.website)
-            const websitePrice = candidate.facts.find(
-              (fact) => fact.key === 'price' && fact.sourceType === 'website',
-            )
-            return (
-              <div
-                className={`option-row cursor-pointer px-4 py-5 transition-colors ${
-                  checked || selectedForContact
-                    ? 'bg-sky-100/40'
-                    : 'hover:bg-slate-100/40'
-                }`}
-                key={candidate._id}
-              >
-                <label
-                  className="flex items-start gap-3"
-                  htmlFor={`candidate-${candidate._id}`}
-                >
-                  <input
-                    aria-label={`Select ${candidate.name}`}
-                    checked={checked || selectedForContact}
-                    className="ink-checkbox mt-1"
-                    disabled={
-                      selectedForContact ||
-                      !hasEmail ||
-                      isContacting ||
-                      !canFollowUp
-                    }
-                    id={`candidate-${candidate._id}`}
-                    onChange={() => toggle(candidate._id)}
-                    type="checkbox"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <strong>{candidate.name}</strong>
-                      {candidate.recommendationScore !== undefined ? (
-                        <span className="shrink-0 text-sm font-semibold text-sky-700 dark:text-sky-300">
-                          {Math.round(candidate.recommendationScore)}/100
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                      {candidate.recommendationReason ??
-                        'This option matches your request.'}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {selectedForContact
-                        ? 'Follow-up in progress'
-                        : websitePrice
-                          ? `Website price: ${displayEvidenceValue(websitePrice.value.value)}`
-                          : hasEmail
-                            ? 'No public price found · follow-up available'
-                            : 'No public price or email follow-up found'}
-                    </p>
-                  </div>
-                </label>
-                {websiteUrl ? (
-                  <p className="mt-3 pl-8 text-xs">
-                    <a
-                      className="font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-100"
-                      href={websiteUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      View website <span aria-hidden="true">↗</span>
-                    </a>
-                  </p>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="mt-3 py-8 text-center">
-          <p className="font-medium">
-            {rankingReady
-              ? 'No suitable options yet'
-              : 'Options are on the way'}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            The agent progress above updates automatically.
-          </p>
-        </div>
-      )}
-
-      {options.length ? (
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">
-            {selected.length} selected · up to 5
-          </p>
-          <Button
-            disabled={
-              !selected.length ||
-              detail.request.automationPaused ||
-              !rankingReady ||
-              !canFollowUp ||
-              isContacting
+          <RequestConversation
+            showHistory={false}
+            answer={answerDraft}
+            history={detail.questions.flatMap((question) =>
+              question.answer
+                ? [
+                    {
+                      id: question._id,
+                      text: question.text,
+                      importance: question.importance,
+                      answer: question.answer,
+                    },
+                  ]
+                : [],
+            )}
+            isAnswering={isAnswering}
+            loaderPhase={
+              detail.request.status === 'draft' ? 'interpreting' : undefined
             }
-            onClick={() => {
-              onError(null)
-              setIsContacting(true)
-              void selectCandidates({
-                requestId: detail.request._id,
-                candidateIds: selected,
+            onAnswerChange={setAnswerDraft}
+            onAnswerSubmit={(event) => {
+              event.preventDefault()
+              if (!firstOpenQuestion) return
+              setError(null)
+              setIsAnswering(true)
+              void answerQuestion({
+                questionId: firstOpenQuestion._id,
+                answer: answerDraft,
               })
-                .then(() => setSelected([]))
+                .then(() => setAnswerDraft(''))
                 .catch((reason) =>
-                  onError(
-                    errorMessage(reason, 'Could not contact these options.'),
-                  ),
+                  setError(errorMessage(reason, 'Answer could not be saved.')),
                 )
-                .finally(() => setIsContacting(false))
+                .finally(() => setIsAnswering(false))
             }}
-            size="sm"
-          >
-            {isContacting ? 'Starting follow-up…' : 'Follow up with selected'}
-          </Button>
+            prompt={detail.request.prompt}
+            question={firstOpenQuestion}
+          />
         </div>
       ) : null}
-
-      {detail.outreach.length ? (
-        <details
-          className="mt-4"
-          open={detail.outreach.some((attempt) =>
-            ['retryable_failure', 'permanent_failure', 'needs_user'].includes(
-              attempt.status,
-            ),
-          )}
-        >
-          <summary className="cursor-pointer py-2 text-sm font-semibold">
-            Follow-up activity ({detail.outreach.length})
-          </summary>
-          <OutreachStatus
+      {detail.request.status !== 'draft' ? (
+        <div className="space-y-6">
+          <DecisionPanel
             detail={detail}
-            onError={onError}
+            onError={setError}
             retryFailed={retryFailed}
+            selectCandidates={selectCandidates}
           />
-        </details>
+        </div>
       ) : null}
     </section>
   )

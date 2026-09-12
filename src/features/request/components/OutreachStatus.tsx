@@ -47,9 +47,11 @@ const states: Record<
 
 export function OutreachStatus({
   detail,
+  compact = false,
   onError,
   retryFailed,
 }: {
+  compact?: boolean
   detail: RequestDetailValue
   onError: (value: string | null) => void
   retryFailed: (args: { attemptId: string }) => Promise<unknown>
@@ -81,31 +83,36 @@ export function OutreachStatus({
   }
 
   return (
-    <section className="mt-10 space-y-6" aria-label="Outreach status">
-      <header className="flex items-start gap-3">
-        <svg
-          aria-hidden="true"
-          className="mt-1 size-10 shrink-0 text-sky-700"
-          viewBox="0 0 40 40"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m4 11 31-2 2 23-31 1zM5 12l16 12L35 10M7 31l9-11m19 10-10-9" />
-        </svg>
-        <div>
-          <h3 className="text-3xl font-bold">Notes to your vendors</h3>
-          <p
-            className="mt-1 text-sm leading-6 text-slate-600"
-            aria-live="polite"
+    <section
+      className={compact ? 'mt-4 space-y-3' : 'mt-10 space-y-6'}
+      aria-label="Outreach status"
+    >
+      {!compact ? (
+        <header className="flex items-start gap-3">
+          <svg
+            aria-hidden="true"
+            className="mt-1 size-10 shrink-0 text-sky-700"
+            viewBox="0 0 40 40"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            {sent} sent · {pending} in progress
-            {attention ? ` · ${attention} need attention` : ''}
-          </p>
-        </div>
-      </header>
+            <path d="m4 11 31-2 2 23-31 1zM5 12l16 12L35 10M7 31l9-11m19 10-10-9" />
+          </svg>
+          <div>
+            <h3 className="text-3xl font-bold">Notes to your vendors</h3>
+            <p
+              className="mt-1 text-sm leading-6 text-slate-600"
+              aria-live="polite"
+            >
+              {sent} sent · {pending} in progress
+              {attention ? ` · ${attention} need attention` : ''}
+            </p>
+          </div>
+        </header>
+      ) : null}
       <ul className="space-y-6">
         {detail.outreach.map((attempt) => {
           const candidate = detail.candidates.find(

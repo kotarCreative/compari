@@ -1,147 +1,188 @@
 import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
+import { OutreachStatus } from '../request/components/OutreachStatus'
+import {
+  displayEvidenceValue,
+  safeEvidenceUrl,
+} from '../request/evidencePolicy'
 import { decisionApi } from './contracts'
 import { ViewRenderer } from './ViewRenderer'
-import type {
-  DecisionProposal as Proposal,
-  DecisionProvider as Provider,
-} from './contracts'
+import type { ReactNode } from 'react'
+import type { RequestDetailValue } from '../request/contracts'
+import type { DecisionProposal as Proposal } from './contracts'
 import { Alert, Badge, Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 import { DetailDialog } from '~/components/common/DetailDialog'
 
+type Provider = RequestDetailValue['candidates'][number]
+
 export function DecisionPanel({
-  requestId,
-  status,
-  providers = [],
+  detail,
+  onError,
+  retryFailed,
+  selectCandidates,
 }: {
-  requestId: string
-  status: string
-  providers?: Array<Provider>
+  detail: RequestDetailValue
+  onError: (value: string | null) => void
+  retryFailed: (args: { attemptId: string }) => Promise<unknown>
+  selectCandidates: (args: {
+    requestId: string
+    candidateIds: Array<string>
+  }) => Promise<unknown>
 }) {
+  const { _id: requestId, status } = detail.request
   const data = useQuery(decisionApi.evaluations.list, { requestId })
   const proposals = useQuery(decisionApi.proposals.list, { requestId })
   const confirmChoice = useMutation(decisionApi.selections.confirmChoice)
   const [error, setError] = useState<string | null>(null)
-  const [activeIndex, setActiveIndex] = useState(0)
-  if (!data)
-    return (
-      <p className="mt-3 text-sm text-slate-500">Loading decision state…</p>
-    )
-  const providerOrder = new Map(
-    providers.map((provider, index) => [provider.id, index]),
+  const [contacting, setContacting] = useState<Array<string>>([])
+  const received = new Map<string, Proposal>()
+  for (const proposal of proposals ?? []) {
+    if (proposal.status !== 'received') continue
+    const previous = received.get(proposal.candidateId)
+    if (!previous || proposal.version > previous.version)
+      received.set(proposal.candidateId, proposal)
+  }
+  const providers = detail.candidates.filter(
+    (candidate) =>
+      ['recommended', 'selected'].includes(
+        candidate.recommendationStatus ?? '',
+      ) || received.has(candidate._id),
   )
-  const received = (
-    proposals?.filter((proposal) => proposal.status === 'received') ?? []
-  ).sort(
-    (left, right) =>
-      (providerOrder.get(left.candidateId) ?? Number.MAX_SAFE_INTEGER) -
-      (providerOrder.get(right.candidateId) ?? Number.MAX_SAFE_INTEGER),
-  )
-  const visibleIndex = received.length
-    ? Math.min(activeIndex, received.length - 1)
-    : 0
-  const activeProposal = received.at(visibleIndex)
-  const showPrevious = () =>
-    setActiveIndex((current) =>
-      current <= 0 ? received.length - 1 : current - 1,
-    )
-  const showNext = () =>
-    setActiveIndex((current) => (current + 1) % received.length)
-  if (!received.length && !data.evaluation) return null
+  const canContact =
+    [
+      'researching',
+      'contacting',
+      'collecting_responses',
+      'awaiting_selection',
+    ].includes(status) &&
+    !detail.request.automationPaused &&
+    detail.request.rankingStatus === 'ready' &&
+    detail.request.rankingVersion === detail.request.version
+
+  async function contact(candidateId: string) {
+    onError(null)
+    setContacting((current) => [...current, candidateId])
+    try {
+      await selectCandidates({ requestId, candidateIds: [candidateId] })
+    } catch (reason) {
+      onError(errorMessage(reason, 'Could not contact this vendor.'))
+    } finally {
+      setContacting((current) => current.filter((id) => id !== candidateId))
+    }
+  }
+
   return (
-    <section className="space-y-3">
+    <section className="space-y-5" aria-labelledby="quotes-heading">
       <div>
-        <h3 className="text-lg font-semibold">Compare your options</h3>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          {data.evaluation?.recommendation ??
-            'The comparison agent is preparing a side-by-side view.'}
+        <h3 id="quotes-heading" className="text-lg font-semibold">
+          Your options & quotes
+        </h3>
+        <p className="text-sm text-slate-600">
+          Prices update as we find them. Contact any vendor to confirm missing
+          details.
         </p>
+        {data?.evaluation ? (
+          <p className="mt-2 text-sm">{data.evaluation.recommendation}</p>
+        ) : null}
       </div>
-      {data.views.length ? (
+      {data?.views.length ? (
         <DetailDialog label="Comparison notes">
           <ViewRenderer views={data.views} />
         </DetailDialog>
       ) : null}
-      {received.length ? (
-        <div
-          aria-label="Provider options"
-          aria-roledescription="carousel"
-          className="space-y-4 py-4 text-sm"
-          role="region"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="font-hand text-2xl font-bold">
-                {status === 'awaiting_selection'
-                  ? 'Your quotes'
-                  : 'Quotes found online'}
-              </h4>
-              {received.length ? (
-                <p className="text-xs text-slate-500" aria-live="polite">
-                  Option {visibleIndex + 1} of {received.length}
+      <div className="grid gap-5">
+        {providers.map((provider) => {
+          const proposal = received.get(provider._id)
+          const website = safeEvidenceUrl(provider.website)
+          const hasEmail = provider.endpoints.some(
+            (endpoint) =>
+              endpoint.type === 'email' &&
+              ['public', 'verified'].includes(endpoint.verificationState),
+          )
+          const attempts = detail.outreach.filter(
+            (attempt) => attempt.candidateId === provider._id,
+          )
+          const selected =
+            provider.recommendationStatus === 'selected' || attempts.length > 0
+          const busy = contacting.includes(provider._id)
+          return (
+            <ConfirmationCard
+              key={provider._id}
+              provider={provider}
+              proposal={proposal}
+              requestId={requestId}
+              confirmChoice={confirmChoice}
+              onError={setError}
+              selectable={status === 'awaiting_selection'}
+              finished={status === 'completed' || status === 'cancelled'}
+            >
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                {!selected && !['completed', 'cancelled'].includes(status) ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      busy ||
+                      !canContact ||
+                      !hasEmail ||
+                      provider.status !== 'qualified' ||
+                      provider.recommendationStatus !== 'recommended'
+                    }
+                    onClick={() => void contact(provider._id)}
+                    aria-label={`Contact ${provider.name}`}
+                  >
+                    {busy ? 'Starting follow-up…' : 'Contact vendor'}
+                  </Button>
+                ) : null}
+                {website ? (
+                  <a
+                    className="text-sm text-sky-700 underline underline-offset-2"
+                    href={website}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View website ↗
+                  </a>
+                ) : null}
+              </div>
+              {!selected && !hasEmail ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  No verified email available for follow-up.
                 </p>
               ) : null}
-            </div>
-            {received.length > 1 ? (
-              <div
-                className="flex items-center gap-1"
-                aria-label="Choose an option to view"
-              >
-                <Button
-                  aria-label="Show previous option"
-                  onClick={showPrevious}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <span aria-hidden="true">←</span>
-                </Button>
-                <Button
-                  aria-label="Show next option"
-                  onClick={showNext}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <span aria-hidden="true">→</span>
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          {activeProposal ? (
-            <div aria-live="polite">
-              <ConfirmationCard
-                confirmChoice={confirmChoice}
-                key={activeProposal._id}
-                onError={setError}
-                proposal={activeProposal}
-                provider={providers.find(
-                  (item) => item.id === activeProposal.candidateId,
-                )}
-                requestId={requestId}
-                selectable={status === 'awaiting_selection'}
-                finished={status === 'completed' || status === 'cancelled'}
-              />
-            </div>
-          ) : (
-            <p className="text-slate-500">
-              No current received proposal is available to confirm.
-            </p>
-          )}
-          {received.length > 1 ? (
-            <div className="flex justify-center gap-2">
-              {received.map((proposal, index) => (
-                <button
-                  aria-label={`Show option ${index + 1}`}
-                  aria-current={index === visibleIndex ? 'true' : undefined}
-                  className="size-2.5 rounded-full border border-slate-500 bg-transparent transition-transform aria-current:scale-125 aria-current:bg-sky-600"
-                  key={proposal._id}
-                  onClick={() => setActiveIndex(index)}
-                  type="button"
+              {!selected &&
+              hasEmail &&
+              !canContact &&
+              !['completed', 'cancelled'].includes(status) ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {detail.request.automationPaused
+                    ? 'Resume agents to contact this vendor.'
+                    : 'Contact will be available when the current ranking and comparison are ready.'}
+                </p>
+              ) : null}
+              {attempts.length ? (
+                <OutreachStatus
+                  compact
+                  detail={{ ...detail, outreach: attempts }}
+                  onError={onError}
+                  retryFailed={retryFailed}
                 />
-              ))}
-            </div>
-          ) : null}
-        </div>
+              ) : selected ? (
+                <p className="mt-3 text-sm text-slate-500">
+                  Follow-up requested
+                </p>
+              ) : null}
+            </ConfirmationCard>
+          )
+        })}
+      </div>
+      {!providers.length ? (
+        <p className="py-8 text-center text-sm text-slate-500">
+          {detail.request.rankingStatus === 'ready'
+            ? 'No suitable options yet.'
+            : 'Options are on the way. Cards will appear here as results become available.'}
+        </p>
       ) : null}
       {error ? <Alert variant="destructive">{error}</Alert> : null}
     </section>
@@ -152,14 +193,16 @@ function ConfirmationCard({
   requestId,
   proposal,
   provider,
+  children,
   confirmChoice,
   onError,
   selectable,
   finished,
 }: {
   requestId: string
-  proposal: Proposal
-  provider?: Provider
+  proposal?: Proposal
+  provider: Provider
+  children: ReactNode
   confirmChoice: (args: {
     requestId: string
     candidateId: string
@@ -170,12 +213,24 @@ function ConfirmationCard({
   finished: boolean
   selectable: boolean
 }) {
-  const attributes = record(proposal.attributes.value)
+  const attributes = record(proposal?.attributes.value)
   const [isSelecting, setIsSelecting] = useState(false)
-  const term = (key: string) =>
-    typeof attributes[key] === 'string' || typeof attributes[key] === 'number'
-      ? String(attributes[key])
-      : 'Not supplied'
+  const term = (key: string) => {
+    const value = attributes[key]
+    if (typeof value === 'string' || typeof value === 'number')
+      return String(value)
+    const fact = [...provider.facts]
+      .filter(
+        (item) =>
+          item.key === key && ['website', 'provider'].includes(item.sourceType),
+      )
+      .sort((left, right) => right.observedAt - left.observedAt)
+      .at(0)
+    if (!fact) return key === 'price' ? 'Price not found yet' : 'Not supplied'
+    return typeof fact.value.value === 'string'
+      ? fact.value.value
+      : displayEvidenceValue(fact.value.value)
+  }
   const details = Object.entries(attributes)
     .filter(
       ([key, value]) =>
@@ -196,6 +251,7 @@ function ConfirmationCard({
     : []
   const isWebsiteQuote = attributes.evidence_source === 'Public website'
   const selectOption = async () => {
+    if (!proposal) return
     onError(null)
     setIsSelecting(true)
     try {
@@ -216,18 +272,34 @@ function ConfirmationCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-sky-800">
-            {isWebsiteQuote ? 'Published website quote' : 'Provider option'}
+            {proposal
+              ? isWebsiteQuote
+                ? 'Published website quote'
+                : 'Provider quote'
+              : 'Vendor option'}
           </p>
           <h5 className="mt-1 font-hand text-3xl font-bold leading-tight">
-            {provider?.name ?? 'Provider'}
+            {provider.name}
           </h5>
         </div>
-        <Badge variant="outline">
-          {Math.round(proposal.confidence * 100)}% confidence
-        </Badge>
+        {provider.recommendationScore !== undefined ? (
+          <Badge variant="outline">
+            {Math.round(provider.recommendationScore)}/100 match
+          </Badge>
+        ) : null}
+        {proposal ? (
+          <Badge variant="outline">
+            {Math.round(proposal.confidence * 100)}% confidence
+          </Badge>
+        ) : null}
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+      {provider.recommendationReason ? (
+        <p className="mt-3 text-sm text-slate-600">
+          {provider.recommendationReason}
+        </p>
+      ) : null}
+      <dl aria-live="polite" className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="decision-term">
           <dt>Price</dt>
           <dd>{term('price')}</dd>
@@ -245,28 +317,33 @@ function ConfirmationCard({
           </dd>
         </div>
       </dl>
-      <details className="mt-5 border-t border-dashed border-slate-300 pt-4">
-        <summary className="cursor-pointer text-sm font-semibold">
-          Quote details
-        </summary>
-        <p className="mt-3 text-sm leading-6 text-slate-700">
-          {proposal.summary}
-        </p>
-        <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          {details.map(([key, value]) => (
-            <div key={key}>
-              <dt className="font-semibold text-slate-600">{humanize(key)}</dt>
-              <dd className="mt-0.5 text-slate-800">{String(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      </details>
+      {proposal ? (
+        <details className="mt-5 border-t border-dashed border-slate-300 pt-4">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Quote details
+          </summary>
+          <p className="mt-3 text-sm leading-6 text-slate-700">
+            {proposal.summary}
+          </p>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            {details.map(([key, value]) => (
+              <div key={key}>
+                <dt className="font-semibold text-slate-600">
+                  {humanize(key)}
+                </dt>
+                <dd className="mt-0.5 text-slate-800">{String(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
       {missingInformation.length ? (
         <div className="mt-5 rounded-lg bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
           <strong>Still to confirm:</strong> {missingInformation.join(', ')}
         </div>
       ) : null}
-      {selectable ? (
+      {children}
+      {selectable && proposal ? (
         <Button
           className="mt-6"
           disabled={isSelecting}
@@ -275,7 +352,7 @@ function ConfirmationCard({
         >
           {isSelecting ? 'Selecting…' : 'Choose this option'}
         </Button>
-      ) : !finished ? (
+      ) : !finished && proposal ? (
         <p className="mt-5 text-xs text-slate-500">
           {isWebsiteQuote
             ? 'Website price · comparison in progress.'

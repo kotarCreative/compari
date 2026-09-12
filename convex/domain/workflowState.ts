@@ -25,7 +25,7 @@ const requestTransitions: Record<
   draft: ['researching', 'cancelled'],
   researching: ['contacting', 'evaluating', 'cancelled'],
   contacting: ['collecting_responses', 'cancelled'],
-  collecting_responses: ['evaluating', 'cancelled'],
+  collecting_responses: ['contacting', 'evaluating', 'cancelled'],
   evaluating: ['awaiting_selection', 'cancelled'],
   awaiting_selection: ['contacting', 'completed', 'cancelled'],
   completed: [],

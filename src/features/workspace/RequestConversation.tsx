@@ -12,6 +12,7 @@ import { Button, Label, Textarea } from '~/components/ui'
 export function RequestConversation({
   prompt,
   history = [],
+  showHistory = true,
   question,
   answer = '',
   error,
@@ -23,6 +24,7 @@ export function RequestConversation({
   canEditLocation = false,
   suggestions = [],
 }: {
+  showHistory?: boolean
   prompt: string
   history?: Array<{
     id: string
@@ -78,7 +80,7 @@ export function RequestConversation({
       className="mx-auto w-full max-w-2xl space-y-4"
     >
       <div role="log" aria-label="Chat history" className="space-y-4">
-        {previousMessages}
+        {showHistory ? previousMessages : null}
         {question ? <QuestionBubble question={question} /> : null}
       </div>
 

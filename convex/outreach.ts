@@ -22,7 +22,12 @@ export const selectCandidates = mutation({
     const { request, user } = await requireOwnedRequest(ctx, args.requestId)
     if (
       request.automationPaused ||
-      !['researching', 'awaiting_selection'].includes(request.status) ||
+      ![
+        'researching',
+        'contacting',
+        'collecting_responses',
+        'awaiting_selection',
+      ].includes(request.status) ||
       request.rankingStatus !== 'ready' ||
       request.rankingVersion !== request.version
     )
@@ -156,7 +161,8 @@ export const selectCandidates = mutation({
         jobId,
       })
     }
-    transitionRequest(request.status, 'contacting')
+    if (request.status !== 'contacting')
+      transitionRequest(request.status, 'contacting')
     await ctx.db.patch('procurementRequests', request._id, {
       status: 'contacting',
       candidateCounts: {

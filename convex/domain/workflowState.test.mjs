@@ -91,3 +91,16 @@ test('candidate transitions and domain normalization are deterministic', () => {
   )
   assert.equal(canResearch('too short'), false)
 })
+
+test('additional vendor outreach can start while collecting replies, but not after closure', () => {
+  assert.equal(
+    transitionRequest('collecting_responses', 'contacting'),
+    'contacting',
+  )
+  for (const status of ['completed', 'cancelled', 'draft']) {
+    assert.throws(
+      () => transitionRequest(status, 'contacting'),
+      /cannot transition/,
+    )
+  }
+})
