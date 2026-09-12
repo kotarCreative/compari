@@ -11,7 +11,6 @@ import {
 import { RequestConversation } from './RequestConversation'
 import type { FormEvent } from 'react'
 import { BrandLogo } from '~/components/common/BrandLogo'
-import { NotebookPal } from '~/components/common/NotebookPal'
 import { Button, Input, Label, Textarea } from '~/components/ui'
 
 export function FirstSearch({
@@ -77,9 +76,14 @@ export function FirstSearch({
 
   return (
     <main className="welcome-shell mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-12">
-      <BrandLogo />
+      <header className="welcome-brand-row">
+        <BrandLogo />
+        <span className="welcome-tagline">
+          Your personal research companion
+        </span>
+      </header>
       <div
-        className="mt-8 flex items-center gap-3 text-xs font-medium text-slate-500"
+        className="welcome-steps mt-8 flex items-center gap-3 text-xs font-medium text-slate-500"
         aria-label={`Step ${step === 'name' ? '1' : '2'} of 2`}
       >
         <span className="step-pill" data-active={step === 'name'}>
@@ -91,27 +95,32 @@ export function FirstSearch({
         </span>
       </div>
       {step === 'name' ? (
-        <section className="welcome-page animate-onboarding-welcome mt-6 space-y-6">
+        <section className="welcome-page animate-onboarding-welcome mt-6 space-y-8">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-3">
-              <p className="hand-note text-sky-700">
-                A little help. A lot less homework.
-              </p>
-              <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
+              <p className="welcome-eyebrow">LESS SEARCHING. MORE CERTAINTY.</p>
+              <h1 className="welcome-heading text-5xl sm:text-6xl">
                 Big decisions.
                 <br />
                 <span className="text-sky-700 dark:text-sky-300">
                   A little less work.
                 </span>
               </h1>
-              <p className="max-w-xl text-slate-600 dark:text-slate-300">
+              <p className="max-w-md text-base leading-7 text-slate-600 dark:text-slate-300">
                 Meet your new research buddy. Tell us what you need, and we’ll
                 help you find and compare the right vendors.
               </p>
             </div>
-            <NotebookPal className="notebook-pal hidden sm:block" />
           </div>
-          <form className="space-y-3" onSubmit={acceptName}>
+          <form className="welcome-form space-y-3" onSubmit={acceptName}>
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold">
+                First, a quick introduction.
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Let’s make this a little more personal.
+              </p>
+            </div>
             <Label htmlFor="profile-full-name">First and last name</Label>
             <Input
               autoComplete="name"
@@ -127,7 +136,7 @@ export function FirstSearch({
               We use your name for your buyer inbox and to sign vendor outreach.
             </p>
             <Button
-              className="mt-3"
+              className="mt-3 w-full"
               size="lg"
               type="submit"
               disabled={isSessionLoading}
@@ -230,9 +239,17 @@ export function FirstSearch({
           </form>
         </section>
       )}
-      <p className="hand-note mt-6 text-center text-slate-500">
-        You make the wish. We do the digging. ♡
-      </p>
+      <footer className="welcome-footer">
+        <span>
+          01 <span>Tell us what you need</span>
+        </span>
+        <span>
+          02 <span>We do the research</span>
+        </span>
+        <span>
+          03 <span>You make the call</span>
+        </span>
+      </footer>
     </main>
   )
 }

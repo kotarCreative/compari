@@ -61,10 +61,10 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
-      <header className="flex items-start justify-between gap-4 pb-6 dark:border-slate-800">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-8">
         <div>
           <BrandLogo />
-          <h1 className="mt-2 text-3xl font-bold">
+          <h1 className="mt-8 text-3xl font-bold tracking-tight">
             Welcome, {firstName}
             <span className="text-sky-600">.</span>
           </h1>
@@ -125,10 +125,10 @@ function RequestWorkspace({
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold">Your requests</h2>
         <Link
-          className="marker-button font-hand text-xl font-bold text-slate-900"
+          className="inline-flex min-h-11 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
           to="/requests/new"
         >
-          New request
+          + New request
         </Link>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -178,7 +178,7 @@ function RequestWorkspace({
             >
               <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
                 <div>
-                  <CardTitle className="text-3xl">{request.title}</CardTitle>
+                  <CardTitle className="text-xl">{request.title}</CardTitle>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
                     {request.prompt}
                   </p>
@@ -186,7 +186,7 @@ function RequestWorkspace({
                 <StatusBadge status={request.status} />
               </CardHeader>
               <CardContent className="mt-auto">
-                <dl className="grid grid-cols-3 gap-2 text-center">
+                <dl className="grid grid-cols-3 gap-2 rounded-xl bg-white/60 text-center">
                   {[
                     ['Discovered', request.candidateCounts.discovered],
                     ['Qualified', request.candidateCounts.qualified],
