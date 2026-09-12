@@ -11,7 +11,6 @@ import { Button, Label, Textarea } from '~/components/ui'
 
 export function RequestConversation({
   prompt,
-  collapseHistory = false,
   history = [],
   question,
   answer = '',
@@ -22,9 +21,9 @@ export function RequestConversation({
   onAnswerSubmit,
   location,
   canEditLocation = false,
+  suggestions = [],
 }: {
   prompt: string
-  collapseHistory?: boolean
   history?: Array<{
     id: string
     text: string
@@ -40,21 +39,27 @@ export function RequestConversation({
   onAnswerSubmit?: (event: FormEvent<HTMLFormElement>) => void
   location?: string
   canEditLocation?: boolean
+  suggestions?: Array<string>
 }) {
   const answerInput = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!question) return
+    if (!question && prompt) return
     answerInput.current?.focus()
-  }, [question?._id])
+  }, [question?._id, prompt])
 
   const previousMessages = (
     <>
-      <div className="flex justify-end">
-        <p className="max-w-[88%] whitespace-pre-wrap bg-sky-100/40 px-4 py-3 text-sm leading-6 text-slate-800">
-          {prompt}
-        </p>
-      </div>
+      <QuestionBubble
+        question={{ text: 'What can we help you find?', importance: 'initial' }}
+      />
+      {prompt ? (
+        <div className="flex justify-end">
+          <p className="max-w-[88%] whitespace-pre-wrap bg-sky-100/40 px-4 py-3 text-sm leading-6 text-slate-800">
+            {prompt}
+          </p>
+        </div>
+      ) : null}
       {history.map((item) => (
         <div className="space-y-3" key={item.id}>
           <QuestionBubble question={item} />
@@ -68,28 +73,24 @@ export function RequestConversation({
     </>
   )
   return (
-    <section className="mx-auto w-full max-w-2xl space-y-4">
-      {collapseHistory ? (
-        <details className="text-sm">
-          <summary className="cursor-pointer py-2 font-semibold">
-            Request & previous answers
-          </summary>
-          <div className="space-y-3">{previousMessages}</div>
-        </details>
-      ) : (
-        previousMessages
-      )}
+    <section
+      aria-label="Request conversation"
+      className="mx-auto w-full max-w-2xl space-y-4"
+    >
+      <div role="log" aria-label="Chat history" className="space-y-4">
+        {previousMessages}
+        {question ? <QuestionBubble question={question} /> : null}
+      </div>
 
-      {question ? (
+      {question || (!prompt && onAnswerSubmit) ? (
         <div className="space-y-3">
-          <QuestionBubble question={question} />
           <form className="space-y-2" onSubmit={onAnswerSubmit}>
             <Label className="sr-only" htmlFor="request-conversation-answer">
-              Your answer
+              {prompt ? 'Your answer' : 'Your request'}
             </Label>
             <Textarea
               autoFocus
-              className="min-h-24"
+              className="min-h-24 text-2xl"
               disabled={isAnswering}
               id="request-conversation-answer"
               ref={answerInput}
@@ -100,24 +101,52 @@ export function RequestConversation({
                   event.currentTarget.form?.requestSubmit()
                 }
               }}
-              placeholder="Type your answer here…"
+              placeholder={
+                prompt
+                  ? 'Type your answer here…'
+                  : 'Tell us what you’re looking for…'
+              }
+              minLength={prompt ? 1 : 12}
               required
               value={answer}
             />
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
                 Press <kbd className="font-sans">⌘/Ctrl</kbd> +{' '}
-                <kbd className="font-sans">Enter</kbd> to answer.
+                <kbd className="font-sans">Enter</kbd> to send.
               </p>
               <Button
-                disabled={isAnswering || !answer.trim()}
+                disabled={
+                  isAnswering || answer.trim().length < (prompt ? 1 : 12)
+                }
                 size="sm"
                 type="submit"
               >
-                {isAnswering ? 'Saving…' : 'Answer'}
+                {isAnswering
+                  ? 'Saving…'
+                  : prompt
+                    ? 'Answer'
+                    : 'Find my options'}
               </Button>
             </div>
           </form>
+          {!prompt && suggestions.length ? (
+            <div
+              aria-label="Example requests"
+              className="flex flex-col items-start"
+            >
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  className="suggestion-chip"
+                  type="button"
+                  onClick={() => onAnswerChange?.(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : loaderPhase ? (
         <div className="animate-onboarding-welcome pl-5 py-2">
@@ -150,7 +179,7 @@ export function RequestConversation({
           className="pl-1 text-sm text-slate-600 dark:text-slate-300"
           role="status"
         >
-          Thanks — Compari is continuing the vendor search with these details.
+          Your conversation is saved here. Any new questions will appear below.
         </p>
       )}
 
@@ -174,9 +203,7 @@ function QuestionBubble({
     <div className="flex justify-start">
       <div className="max-w-[88%] px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-          {question.importance === 'required'
-            ? 'One detail needed'
-            : 'One helpful detail'}
+          Compari
         </p>
         <p className="mt-1 text-sm leading-6">{question.text}</p>
       </div>

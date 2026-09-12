@@ -118,9 +118,8 @@ export function RequestDetail({
 
       {error ? <Alert variant="destructive">{error}</Alert> : null}
 
-      {isIntakeVisible ? (
+      <div>
         <RequestConversation
-          collapseHistory
           answer={answerDraft}
           history={detail.questions.flatMap((question) =>
             question.answer
@@ -157,7 +156,8 @@ export function RequestDetail({
           prompt={detail.request.prompt}
           question={firstOpenQuestion}
         />
-      ) : (
+      </div>
+      {!isIntakeVisible ? (
         <div className="space-y-6">
           {detail.request.status === 'researching' ? (
             <Options
@@ -199,7 +199,7 @@ export function RequestDetail({
             status={detail.request.status}
           />
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

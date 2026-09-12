@@ -11,8 +11,8 @@ import {
 } from './constants'
 import { OnboardingTransition } from './OnboardingTransition'
 import { RequestConversation } from './RequestConversation'
+import { RequestChatLayout } from './RequestChatLayout'
 import type { Profile } from './contracts'
-import { BrandLogo } from '~/components/common/BrandLogo'
 import { Button, Input, Label } from '~/components/ui'
 
 export function NameOnboarding({ profile }: { profile: Profile }) {
@@ -97,13 +97,12 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
   if (phase !== 'ready') {
     if (pendingPrompt)
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-8">
-          <BrandLogo className="mb-10" />
+        <RequestChatLayout>
           <RequestConversation
             loaderPhase="interpreting"
             prompt={pendingPrompt}
           />
-        </main>
+        </RequestChatLayout>
       )
     return (
       <OnboardingTransition

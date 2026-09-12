@@ -7,6 +7,8 @@ import { NameOnboarding } from '~/features/workspace/NameOnboarding'
 import { WorkspaceShell } from '~/features/workspace/WorkspaceShell'
 import { usersApi } from '~/features/workspace/contracts'
 import { pendingFirstRequestKey } from '~/features/workspace/constants'
+import { RequestChatLayout } from '~/features/workspace/RequestChatLayout'
+import { RequestConversation } from '~/features/workspace/RequestConversation'
 import { publicUrl, siteDescription, siteOrigin } from '~/lib/seo'
 
 export const Route = createFileRoute('/')({
@@ -73,13 +75,24 @@ function Bootstrap() {
         title="Workspace setup needs a retry"
       />
     )
-  if (profile === undefined || profile === null)
+  if (profile === undefined || profile === null) {
+    const pendingPrompt = window.sessionStorage.getItem(pendingFirstRequestKey)
+    if (pendingPrompt)
+      return (
+        <RequestChatLayout>
+          <RequestConversation
+            prompt={pendingPrompt}
+            loaderPhase="interpreting"
+          />
+        </RequestChatLayout>
+      )
     return (
       <CenteredMessage
         detail="This only takes a moment and never sends email on your behalf."
         title="Preparing your buyer workspace…"
       />
     )
+  }
   if (!profile.hasConfirmedName) return <NameOnboarding profile={profile} />
   if (
     isFinishingIntroduction &&

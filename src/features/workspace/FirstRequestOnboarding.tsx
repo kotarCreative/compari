@@ -4,7 +4,7 @@ import { productApi } from '../request/contracts'
 import { pendingFirstRequestIdKey, pendingFirstRequestKey } from './constants'
 import { requestsApi } from './contracts'
 import { RequestConversation } from './RequestConversation'
-import { BrandLogo } from '~/components/common/BrandLogo'
+import { RequestChatLayout } from './RequestChatLayout'
 import { Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 
@@ -96,26 +96,15 @@ export function FirstRequestOnboarding({
         ? 'vendors'
         : undefined
 
-  useEffect(() => {
-    if (
-      !detail ||
-      firstOpenQuestion ||
-      detail.request.interpretedVersion !== detail.request.version ||
-      (detail.request.researchStatus !== 'complete' &&
-        detail.request.researchStatus !== 'empty')
-    )
-      return
-    const timeout = window.setTimeout(() => {
-      window.sessionStorage.removeItem(pendingFirstRequestKey)
-      window.sessionStorage.removeItem(pendingFirstRequestIdKey)
-      onComplete(detail.request._id)
-    }, 2_000)
-    return () => window.clearTimeout(timeout)
-  }, [detail, firstOpenQuestion, onComplete])
+  const resultsReady = Boolean(
+    detail &&
+    !firstOpenQuestion &&
+    detail.request.interpretedVersion === detail.request.version &&
+    ['complete', 'empty'].includes(detail.request.researchStatus),
+  )
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-8 py-12 md:py-20">
-      <BrandLogo className="mb-10" />
+    <RequestChatLayout>
       <RequestConversation
         answer={answerDraft}
         error={
@@ -143,7 +132,7 @@ export function FirstRequestOnboarding({
           ) ?? []
         }
         isAnswering={isAnswering}
-        loaderPhase={loaderPhase}
+        loaderPhase={resultsReady ? undefined : loaderPhase}
         onAnswerChange={setAnswerDraft}
         onAnswerSubmit={(event) => {
           event.preventDefault()
@@ -165,6 +154,24 @@ export function FirstRequestOnboarding({
         canEditLocation
         location={location}
       />
+      {resultsReady && detail ? (
+        <div className="space-y-3 border-t border-slate-200 pt-4">
+          <p className="text-sm" role="status">
+            {detail.request.researchStatus === 'empty'
+              ? 'Research is finished, but we haven’t found suitable options yet.'
+              : 'Your options are ready to review.'}
+          </p>
+          <Button
+            onClick={() => {
+              window.sessionStorage.removeItem(pendingFirstRequestKey)
+              window.sessionStorage.removeItem(pendingFirstRequestIdKey)
+              onComplete(detail.request._id)
+            }}
+          >
+            View results
+          </Button>
+        </div>
+      ) : null}
       {error && !requestId ? (
         <Button
           className="mx-auto mt-4"
@@ -226,6 +233,6 @@ export function FirstRequestOnboarding({
           {isRetryingDiscovery ? 'Retrying research…' : 'Retry research'}
         </Button>
       ) : null}
-    </main>
+    </RequestChatLayout>
   )
 }
