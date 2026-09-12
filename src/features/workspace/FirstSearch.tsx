@@ -96,7 +96,7 @@ export function FirstSearch({
       </div>
       {step === 'name' ? (
         <section className="welcome-page animate-onboarding-welcome mt-6 space-y-8">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-center gap-3 text-center">
             <div className="space-y-3">
               <p className="welcome-eyebrow">LESS SEARCHING. MORE CERTAINTY.</p>
               <h1 className="welcome-heading text-5xl sm:text-6xl">
@@ -106,13 +106,16 @@ export function FirstSearch({
                   A little less work.
                 </span>
               </h1>
-              <p className="max-w-md text-base leading-7 text-slate-600 dark:text-slate-300">
+              <p className="mx-auto max-w-md text-base leading-7 text-slate-600 dark:text-slate-300">
                 Meet your new research buddy. Tell us what you need, and we’ll
                 help you find and compare the right vendors.
               </p>
             </div>
           </div>
-          <form className="welcome-form space-y-3" onSubmit={acceptName}>
+          <form
+            className="welcome-form notebook-form space-y-3"
+            onSubmit={acceptName}
+          >
             <div className="mb-5">
               <h2 className="text-lg font-semibold">
                 First, a quick introduction.
@@ -124,6 +127,7 @@ export function FirstSearch({
             <Label htmlFor="profile-full-name">First and last name</Label>
             <Input
               autoComplete="name"
+              className="text-2xl"
               autoFocus
               id="profile-full-name"
               maxLength={60}
@@ -155,14 +159,14 @@ export function FirstSearch({
         </section>
       ) : (
         <section className="welcome-page mt-6 space-y-8">
-          <div className="animate-onboarding-welcome space-y-2">
+          <div className="animate-onboarding-welcome space-y-2 text-center">
             <p className="text-sm text-slate-500">Nice to meet you.</p>
             <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
               Welcome, {parsedName?.firstName}.
             </h1>
           </div>
           <form
-            className="animate-onboarding-request space-y-4"
+            className="welcome-form notebook-form animate-onboarding-request space-y-4"
             onSubmit={(event) => void submitRequest(event)}
           >
             <div className="space-y-3">
@@ -171,7 +175,7 @@ export function FirstSearch({
               </Label>
               <Textarea
                 autoFocus
-                className="min-h-32"
+                className="min-h-32 text-2xl"
                 id="first-request-prompt"
                 minLength={12}
                 onChange={(event) => setPrompt(event.target.value)}
