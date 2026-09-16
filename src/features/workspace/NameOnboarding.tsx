@@ -14,6 +14,7 @@ import { RequestConversation } from './RequestConversation'
 import { RequestChatLayout } from './RequestChatLayout'
 import type { Profile } from './contracts'
 import { Button, Input, Label } from '~/components/ui'
+import { readSession, removeSession } from '~/lib/storage'
 
 export function NameOnboarding({ profile }: { profile: Profile }) {
   const completeProfile = useMutation(api.users.completeMyProfile)
@@ -24,11 +25,12 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
   )
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
   const didAutoComplete = useRef(false)
+  const autoSaveTimeout = useRef<number | undefined>(undefined)
 
   useEffect(() => {
-    setPendingPrompt(sessionStorage.getItem(pendingFirstRequestKey))
-    const firstName = sessionStorage.getItem(pendingFirstNameKey)
-    const lastName = sessionStorage.getItem(pendingLastNameKey)
+    setPendingPrompt(readSession(pendingFirstRequestKey))
+    const firstName = readSession(pendingFirstNameKey)
+    const lastName = readSession(pendingLastNameKey)
 
     if (!firstName || !lastName) {
       didAutoComplete.current = true
@@ -39,22 +41,23 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
     setFullName(`${firstName} ${lastName}`)
     setPhase('saving')
 
-    const storedStartedAt = sessionStorage.getItem(onboardingStartedAtKey)
+    const storedStartedAt = readSession(onboardingStartedAtKey)
     const startedAt =
       storedStartedAt === null ? Number.NaN : Number(storedStartedAt)
     const elapsed = Number.isFinite(startedAt) ? Date.now() - startedAt : 0
     const remaining = Math.max(0, minimumOnboardingDurationMs - elapsed)
     const timeout = window.setTimeout(() => {
+      autoSaveTimeout.current = undefined
       if (didAutoComplete.current) return
       didAutoComplete.current = true
       void completeProfile({ firstName, lastName })
         .then(() => {
-          sessionStorage.removeItem(pendingFirstNameKey)
-          sessionStorage.removeItem(pendingLastNameKey)
-          sessionStorage.removeItem(onboardingStartedAtKey)
+          removeSession(pendingFirstNameKey)
+          removeSession(pendingLastNameKey)
+          removeSession(onboardingStartedAtKey)
         })
         .catch((reason: unknown) => {
-          sessionStorage.removeItem(onboardingStartedAtKey)
+          removeSession(onboardingStartedAtKey)
           setError(
             reason instanceof Error
               ? reason.message
@@ -63,12 +66,23 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
           setPhase('ready')
         })
     }, remaining)
+    autoSaveTimeout.current = timeout
 
-    return () => window.clearTimeout(timeout)
+    return () => {
+      autoSaveTimeout.current = undefined
+      window.clearTimeout(timeout)
+    }
   }, [completeProfile])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    // Block the pending auto-save timeout so it cannot overwrite the name
+    // the user just submitted with the stale session-storage value.
+    didAutoComplete.current = true
+    if (autoSaveTimeout.current !== undefined) {
+      window.clearTimeout(autoSaveTimeout.current)
+      autoSaveTimeout.current = undefined
+    }
     const name = splitFullName(fullName)
 
     if (!name) {
@@ -81,9 +95,9 @@ export function NameOnboarding({ profile }: { profile: Profile }) {
 
     try {
       await completeProfile(name)
-      sessionStorage.removeItem(pendingFirstNameKey)
-      sessionStorage.removeItem(pendingLastNameKey)
-      sessionStorage.removeItem(onboardingStartedAtKey)
+      removeSession(pendingFirstNameKey)
+      removeSession(pendingLastNameKey)
+      removeSession(onboardingStartedAtKey)
     } catch (reason) {
       setError(
         reason instanceof Error

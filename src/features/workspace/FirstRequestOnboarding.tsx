@@ -7,6 +7,7 @@ import { RequestConversation } from './RequestConversation'
 import { RequestChatLayout } from './RequestChatLayout'
 import { Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
+import { readSession, removeSession, writeSession } from '~/lib/storage'
 
 export function FirstRequestOnboarding({
   prompt,
@@ -22,7 +23,7 @@ export function FirstRequestOnboarding({
   const retryIntake = useMutation(productApi.requests.retryIntake)
   const retryDiscovery = useMutation(productApi.requests.retryDiscovery)
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(() =>
-    window.sessionStorage.getItem(pendingFirstRequestIdKey),
+    readSession(pendingFirstRequestIdKey),
   )
   const resolvedPendingRequestId = useQuery(
     requestsApi.requests.resolvePending,
@@ -42,7 +43,7 @@ export function FirstRequestOnboarding({
   const [isAnswering, setIsAnswering] = useState(false)
   const [isRetryingIntake, setIsRetryingIntake] = useState(false)
   const [isRetryingDiscovery, setIsRetryingDiscovery] = useState(false)
-  const [createAttempt, setCreateAttempt] = useState(0)
+  const [retryNonce, setRetryNonce] = useState(0)
   const isCreating = useRef(false)
   const firstOpenQuestion = detail?.questions.find(
     (question) => question.status === 'open',
@@ -60,7 +61,7 @@ export function FirstRequestOnboarding({
 
   useEffect(() => {
     if (!pendingRequestId || resolvedPendingRequestId !== null) return
-    window.sessionStorage.removeItem(pendingFirstRequestIdKey)
+    removeSession(pendingFirstRequestIdKey)
     setPendingRequestId(null)
   }, [pendingRequestId, resolvedPendingRequestId])
 
@@ -73,17 +74,16 @@ export function FirstRequestOnboarding({
       ...(location ? { location } : {}),
     })
       .then((createdRequestId) => {
-        window.sessionStorage.setItem(
-          pendingFirstRequestIdKey,
-          createdRequestId,
-        )
+        writeSession(pendingFirstRequestIdKey, createdRequestId)
         setPendingRequestId(createdRequestId)
       })
       .catch((reason) => {
         setError(errorMessage(reason, 'Unable to create your first request.'))
-        isCreating.current = false
+        // Keep isCreating.current = true so incidental re-renders or
+        // dependency changes cannot trigger a silent auto-retry loop.
+        // Only the manual retry button below may reset it.
       })
-  }, [create, createAttempt, location, pendingRequestId, prompt])
+  }, [create, retryNonce, location, pendingRequestId, prompt])
 
   useEffect(() => {
     setAnswerDraft('')
@@ -163,8 +163,8 @@ export function FirstRequestOnboarding({
           </p>
           <Button
             onClick={() => {
-              window.sessionStorage.removeItem(pendingFirstRequestKey)
-              window.sessionStorage.removeItem(pendingFirstRequestIdKey)
+              removeSession(pendingFirstRequestKey)
+              removeSession(pendingFirstRequestIdKey)
               onComplete(detail.request._id)
             }}
           >
@@ -178,7 +178,7 @@ export function FirstRequestOnboarding({
           onClick={() => {
             isCreating.current = false
             setError(null)
-            setCreateAttempt((attempt) => attempt + 1)
+            setRetryNonce((nonce) => nonce + 1)
           }}
           variant="outline"
         >

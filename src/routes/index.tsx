@@ -10,6 +10,7 @@ import { pendingFirstRequestKey } from '~/features/workspace/constants'
 import { RequestChatLayout } from '~/features/workspace/RequestChatLayout'
 import { RequestConversation } from '~/features/workspace/RequestConversation'
 import { publicUrl, siteDescription, siteOrigin } from '~/lib/seo'
+import { readSession } from '~/lib/storage'
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -50,10 +51,7 @@ function Bootstrap() {
     // Remember the introduction across the reactive profile update. The name
     // form can unmount before its save promise resolves.
     if (profile && !profile.hasConfirmedName) setIsFinishingIntroduction(true)
-    else if (
-      profile?.hasConfirmedName &&
-      window.sessionStorage.getItem(pendingFirstRequestKey)
-    )
+    else if (profile?.hasConfirmedName && readSession(pendingFirstRequestKey))
       setIsFinishingIntroduction(false)
   }, [profile])
 
@@ -76,7 +74,7 @@ function Bootstrap() {
       />
     )
   if (profile === undefined || profile === null) {
-    const pendingPrompt = window.sessionStorage.getItem(pendingFirstRequestKey)
+    const pendingPrompt = readSession(pendingFirstRequestKey)
     if (pendingPrompt)
       return (
         <RequestChatLayout>
@@ -94,10 +92,7 @@ function Bootstrap() {
     )
   }
   if (!profile.hasConfirmedName) return <NameOnboarding profile={profile} />
-  if (
-    isFinishingIntroduction &&
-    !window.sessionStorage.getItem(pendingFirstRequestKey)
-  )
+  if (isFinishingIntroduction && !readSession(pendingFirstRequestKey))
     return <Navigate to="/requests/new" replace />
   return <WorkspaceShell profile={profile} />
 }

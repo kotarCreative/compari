@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from '~/components/ui'
 import { StatusBadge } from '~/components/common/StatusBadge'
+import { readSession } from '~/lib/storage'
 
 export function WorkspaceShell({ profile }: { profile: Profile }) {
   const { signOut } = useAuthActions()
@@ -32,7 +33,7 @@ export function WorkspaceShell({ profile }: { profile: Profile }) {
   )
 
   useEffect(() => {
-    setPendingFirstPrompt(window.sessionStorage.getItem(pendingFirstRequestKey))
+    setPendingFirstPrompt(readSession(pendingFirstRequestKey))
   }, [])
 
   if (pendingFirstPrompt === undefined)

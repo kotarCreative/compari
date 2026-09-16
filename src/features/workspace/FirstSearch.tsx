@@ -12,6 +12,7 @@ import { RequestChatLayout } from './RequestChatLayout'
 import type { FormEvent } from 'react'
 import { BrandLogo } from '~/components/common/BrandLogo'
 import { Button, Input, Label } from '~/components/ui'
+import { removeSession, writeSession } from '~/lib/storage'
 
 export function FirstSearch({
   isSessionLoading = false,
@@ -46,17 +47,17 @@ export function FirstSearch({
     }
     setIsStarting(true)
     try {
-      window.sessionStorage.setItem(onboardingStartedAtKey, String(Date.now()))
-      window.sessionStorage.setItem(pendingFirstRequestKey, prompt.trim())
-      window.sessionStorage.setItem(pendingFirstNameKey, name.firstName)
-      window.sessionStorage.setItem(pendingLastNameKey, name.lastName)
+      writeSession(onboardingStartedAtKey, String(Date.now()))
+      writeSession(pendingFirstRequestKey, prompt.trim())
+      writeSession(pendingFirstNameKey, name.firstName)
+      writeSession(pendingLastNameKey, name.lastName)
       const result = await signIn('anonymous')
       if (!result.signingIn)
         throw new Error('Anonymous sign-in did not establish a session.')
     } catch {
       setError('We could not create your private workspace. Please try again.')
       setIsStarting(false)
-      window.sessionStorage.removeItem(onboardingStartedAtKey)
+      removeSession(onboardingStartedAtKey)
     }
   }
 

@@ -6,12 +6,13 @@ import { RequestChatLayout } from './RequestChatLayout'
 import { RequestConversation } from './RequestConversation'
 import { pendingFirstRequestKey } from './constants'
 import type { Profile } from './contracts'
+import { readSession, writeSession } from '~/lib/storage'
 
 export function NewRequestPage({ profile }: { profile: Profile }) {
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
   const [startedPrompt, setStartedPrompt] = useState<string | null>(() =>
-    window.sessionStorage.getItem(pendingFirstRequestKey),
+    readSession(pendingFirstRequestKey),
   )
   const [completedRequestId, setCompletedRequestId] = useState<string | null>(
     null,
@@ -47,7 +48,7 @@ export function NewRequestPage({ profile }: { profile: Profile }) {
           event.preventDefault()
           const nextPrompt = prompt.trim()
           if (nextPrompt.length >= 12) {
-            window.sessionStorage.setItem(pendingFirstRequestKey, nextPrompt)
+            writeSession(pendingFirstRequestKey, nextPrompt)
             setStartedPrompt(nextPrompt)
           }
         }}
