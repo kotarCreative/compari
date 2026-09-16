@@ -12,6 +12,7 @@ import type { RequestDetailValue } from '../request/contracts'
 import type { DecisionProposal as Proposal } from './contracts'
 import { Alert, Badge, Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
+import { humanize } from '~/lib/format'
 import { DetailDialog } from '~/components/common/DetailDialog'
 
 type Provider = RequestDetailValue['candidates'][number]
@@ -367,9 +368,4 @@ function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {}
-}
-
-function humanize(value: string) {
-  const words = value.replace(/[_-]/g, ' ')
-  return words.charAt(0).toUpperCase() + words.slice(1)
 }

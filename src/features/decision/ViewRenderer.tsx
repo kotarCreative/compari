@@ -1,3 +1,5 @@
+import { humanize } from '~/lib/format'
+
 type View = {
   _id: string
   label: string
@@ -218,8 +220,4 @@ function EmptyLens() {
       Waiting for enough comparable provider evidence.
     </p>
   )
-}
-
-function humanize(value: string) {
-  return value.replace(/[_-]/g, ' ')
 }
