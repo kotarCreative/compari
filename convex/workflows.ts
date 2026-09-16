@@ -5,7 +5,7 @@ import { internalAction } from './_generated/server'
 import { getWebResearchPort } from './adapters/firecrawl'
 import { getReasoningPort } from './adapters/reasoning'
 import { classifyExternalError } from './domain/outboundPolicy'
-import { pricingEvidencePages } from './domain/websitePricing.ts'
+import { pricingEvidencePages } from './domain/websitePricing'
 
 export const extractRequirements = internalAction({
   args: {

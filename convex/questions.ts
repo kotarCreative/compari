@@ -4,22 +4,6 @@ import { mutation, query } from './_generated/server'
 import { requireOwnedRequest } from './lib/auth'
 import { followUpIdempotencyKey } from './domain/followUpPolicy'
 import { questionsAreSimilar } from './domain/workflowState'
-import type { FunctionReference } from 'convex/server'
-import type { Id } from './_generated/dataModel'
-
-const workflow = internal as unknown as {
-  workflows: {
-    extractRequirements: FunctionReference<
-      'action',
-      'internal',
-      {
-        requestId: Id<'procurementRequests'>
-        jobId: Id<'sideEffectJobs'>
-      },
-      null
-    >
-  }
-}
 
 export const list = query({
   args: { requestId: v.id('procurementRequests') },
@@ -129,7 +113,7 @@ export const answerForRequest = mutation({
         createdAt: now,
         updatedAt: now,
       })
-      await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+      await ctx.scheduler.runAfter(0, internal.workflows.extractRequirements, {
         requestId: request._id,
         jobId,
       })

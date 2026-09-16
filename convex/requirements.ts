@@ -4,22 +4,7 @@ import { mutation, query } from './_generated/server'
 import { requireOwnedRequest } from './lib/auth'
 import { validateBoundedJson } from './domain/workflowState'
 import type { MutationCtx } from './_generated/server'
-import type { FunctionReference } from 'convex/server'
 import type { Id } from './_generated/dataModel'
-
-const workflow = internal as unknown as {
-  workflows: {
-    extractRequirements: FunctionReference<
-      'action',
-      'internal',
-      {
-        requestId: Id<'procurementRequests'>
-        jobId: Id<'sideEffectJobs'>
-      },
-      null
-    >
-  }
-}
 
 async function queueRefresh(
   ctx: MutationCtx,
@@ -44,7 +29,7 @@ async function queueRefresh(
     createdAt: now,
     updatedAt: now,
   })
-  await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+  await ctx.scheduler.runAfter(0, internal.workflows.extractRequirements, {
     requestId: request._id,
     jobId,
   })

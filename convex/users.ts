@@ -3,22 +3,6 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { chooseInboxUsername, inboxJobKey } from './domain/inboxProvisioning'
 import { authUserId, requireCurrentUser, requireIdentity } from './lib/auth'
-import type { Id } from './_generated/dataModel'
-import type { FunctionReference } from 'convex/server'
-
-const agentMailInternal = internal as unknown as {
-  agentMail: {
-    provisionUserInbox: FunctionReference<
-      'action',
-      'internal',
-      {
-        userId: Id<'users'>
-        jobId: Id<'sideEffectJobs'>
-      },
-      null
-    >
-  }
-}
 
 const profileValidator = v.union(
   v.null(),
@@ -162,11 +146,10 @@ export const completeMyProfile = mutation({
       inboxProvisioningAttempts: 0,
       updatedAt: now,
     })
-    await ctx.scheduler.runAfter(
-      0,
-      agentMailInternal.agentMail.provisionUserInbox,
-      { userId: user._id, jobId },
-    )
+    await ctx.scheduler.runAfter(0, internal.agentMail.provisionUserInbox, {
+      userId: user._id,
+      jobId,
+    })
     return null
   },
 })
@@ -220,11 +203,10 @@ export const retryMyInboxProvisioning = mutation({
       scheduledAt: now,
       updatedAt: now,
     })
-    await ctx.scheduler.runAfter(
-      0,
-      agentMailInternal.agentMail.provisionUserInbox,
-      { userId: user._id, jobId: job._id },
-    )
+    await ctx.scheduler.runAfter(0, internal.agentMail.provisionUserInbox, {
+      userId: user._id,
+      jobId: job._id,
+    })
     return null
   },
 })

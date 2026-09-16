@@ -7,8 +7,7 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireCurrentUser, requireOwnedRequest } from './lib/auth'
 import { canResearch, transitionRequest } from './domain/workflowState'
-import type { FunctionReference } from 'convex/server'
-import type { Doc, Id } from './_generated/dataModel'
+import type { Doc } from './_generated/dataModel'
 
 const requestSummary = v.object({
   _id: v.id('procurementRequests'),
@@ -76,23 +75,6 @@ function toActivitySummary(event: Doc<'activityEvents'>) {
   }
 }
 
-const workflow = internal as unknown as {
-  workflows: {
-    discoverProviders: FunctionReference<
-      'action',
-      'internal',
-      { requestId: Id<'procurementRequests'>; jobId: Id<'sideEffectJobs'> },
-      null
-    >
-    extractRequirements: FunctionReference<
-      'action',
-      'internal',
-      { requestId: Id<'procurementRequests'>; jobId: Id<'sideEffectJobs'> },
-      null
-    >
-  }
-}
-
 export const create = mutation({
   args: {
     prompt: v.string(),
@@ -153,7 +135,7 @@ export const create = mutation({
       correlationId: String(jobId),
       createdAt: now,
     })
-    await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+    await ctx.scheduler.runAfter(0, internal.workflows.extractRequirements, {
       requestId,
       jobId,
     })
@@ -183,6 +165,9 @@ export const get = query({
   },
 })
 export const resolvePending = query({
+  // Intentionally v.string(), not v.id(): the id comes from session storage
+  // and may be stale or malformed. normalizeId maps that to null so the
+  // client can clean up, instead of throwing a validation error.
   args: { requestId: v.string() },
   returns: v.union(v.null(), v.id('procurementRequests')),
   handler: async (ctx, args) => {
@@ -271,7 +256,7 @@ export const resumeAutomation = mutation({
         createdAt: now,
         updatedAt: now,
       })
-      await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+      await ctx.scheduler.runAfter(0, internal.workflows.extractRequirements, {
         requestId: request._id,
         jobId,
       })
@@ -316,7 +301,7 @@ export const retryIntake = mutation({
       correlationId: String(job._id),
       createdAt: now,
     })
-    await ctx.scheduler.runAfter(0, workflow.workflows.extractRequirements, {
+    await ctx.scheduler.runAfter(0, internal.workflows.extractRequirements, {
       requestId: request._id,
       jobId: job._id,
     })
@@ -361,7 +346,7 @@ export const retryDiscovery = mutation({
       correlationId: String(job._id),
       createdAt: now,
     })
-    await ctx.scheduler.runAfter(0, workflow.workflows.discoverProviders, {
+    await ctx.scheduler.runAfter(0, internal.workflows.discoverProviders, {
       requestId: request._id,
       jobId: job._id,
     })
