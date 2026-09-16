@@ -582,6 +582,36 @@
   .loading-card {
     animation: onboarding-welcome-up 400ms ease-out both;
   }
+  .typing-buddy {
+    display: inline-flex;
+    align-items: center;
+    width: 44px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .typing-buddy svg {
+    display: block;
+    width: 44px;
+    height: 32px;
+    overflow: visible;
+  }
+  .typing-head {
+    transform-box: fill-box;
+    transform-origin: 50% 90%;
+    animation: typing-bob 1.8s ease-in-out infinite;
+  }
+  .typing-tail {
+    transform-box: fill-box;
+    transform-origin: 0% 80%;
+    animation: typing-tail-wag 1.6s ease-in-out infinite;
+  }
+  .typing-cursor-line-1 {
+    animation: typing-blink 1.2s ease-in-out infinite;
+  }
+  .typing-cursor-line-2 {
+    animation: typing-blink 1.2s ease-in-out infinite;
+    animation-delay: 250ms;
+  }
 }
 @keyframes research-write {
   0% {
@@ -627,6 +657,39 @@
   }
   .research-pen {
     offset-distance: 100%;
+  }
+  .typing-head,
+  .typing-tail,
+  .typing-cursor-line-1,
+  .typing-cursor-line-2 {
+    animation: none;
+  }
+}
+@keyframes typing-bob {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.5deg) translateY(0.6px);
+  }
+}
+@keyframes typing-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes typing-tail-wag {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-9deg);
   }
 }
 @keyframes research-shimmer {

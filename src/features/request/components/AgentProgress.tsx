@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import type { RequestDetailValue } from '../contracts'
+import { TypingBuddy } from '~/components/common/TypingBuddy'
 
 const stages = [
   { status: 'draft', label: 'Getting to know your request' },
@@ -68,9 +69,12 @@ export function AgentProgress({ detail }: { detail: RequestDetailValue }) {
   return (
     <section aria-labelledby={headingId} className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 id={headingId} className="text-2xl font-bold" aria-live="polite">
-          {title}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 id={headingId} className="text-2xl font-bold" aria-live="polite">
+            {title}
+          </h3>
+          {title === 'Finding your options' ? <TypingBuddy /> : null}
+        </div>
         <span className="text-xs text-slate-500">
           {cancelled
             ? 'Stopped'
