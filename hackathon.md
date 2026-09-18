@@ -4,7 +4,7 @@
 - **Event:** Convex All Gas Hackathon
 - **What it does:** A buyer-side procurement workflow in development that turns requests and approximate buyer location into relevant, evidence-backed provider comparisons, with bounded automated research/outreach and an explicit final-choice gate.
 - **Live app:** https://enduring-husky-65.convex.site/
-- **Repo:** none
+- **Repo:** https://github.com/kotarCreative/compari
 - **Frontend:** Convex static hosting (TanStack Start)
 - **Convex deployment:** not deployed
 - **Components:** @convex-dev/static-hosting
@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-4.1-mini, gpt-5.6-luna
 - **Started:** 2026-08-29T03:16:06Z
-- **Last updated:** 2026-09-10T03:50:02Z
+- **Last updated:** 2026-09-16T03:17:13Z
 
 ## Log
 
@@ -138,3 +138,26 @@ links to original vendor websites (`src/components/common/ChairMascot.tsx`,
 the evidence-link test, and the production build pass; generated SEO output was
 checked and the local dev server returned HTTP 200. The public app address was
 supplied by the builder; these latest changes have not been deployed.
+
+### 2026-09-10 - ffa3cde
+
+Made comparison results more evidence-backed: research now extracts relevant
+prices from cited provider pages, rejects unsupported amounts, accepts equivalent
+price formatting, and ranks proposals with flexible attributes (`convex/adapters/`,
+`convex/domain/websitePricing.ts`, `convex/evaluations.ts`, `convex/rankingState.ts`).
+Selection errors now preserve useful server messages (`src/features/decision/`).
+
+### 2026-09-11 - 3c4b2ff
+
+Unified live quotes with individual vendor contact in the request and comparison
+views, while keeping the buyer's intake in one continuous conversation. Added a
+focused comparison flow with collapsible supporting details and clearer loading,
+outreach, and onboarding states (`src/features/decision/`, `src/features/request/`,
+`src/features/workspace/`, `src/components/common/ResearchLoader.tsx`).
+
+### 2026-09-15 - 7e2eacb
+
+Added an animated typing companion to the provider-finding state and moved all
+workspace session persistence behind SSR-safe storage helpers (`src/components/common/TypingBuddy.tsx`,
+`src/features/request/components/AgentProgress.tsx`, `src/lib/storage.ts`). Also
+continued the Convex cleanup by calling generated internal functions directly.
